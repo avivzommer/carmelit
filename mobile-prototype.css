@@ -4,3 +4,8 @@ body { font-family: system-ui, sans-serif; }
 #world-action { position: fixed; z-index: 2; transform: translate(-50%, -100%); min-height: 52px; min-width: 120px; border: 2px solid #ffe4a1; color: #fff4d6; background: #183543ed; font-size: 14px; font-weight: 600; box-shadow: 0 4px 16px #0005; touch-action: manipulation; }
 #world-action::after { content: ''; position: absolute; bottom: -9px; left: calc(50% - 7px); border-top: 8px solid #ffe4a1; border-left: 7px solid transparent; border-right: 7px solid transparent; }
 #world-action[hidden] { display: none; }
+
+#repair-progress { position: fixed; z-index: 3; top: max(14px, env(safe-area-inset-top)); left: max(12px, env(safe-area-inset-left)); display: flex; gap: 8px; padding: 10px 12px; border-radius: 24px; background: #102b39cc; }
+#repair-progress span { color: #72858a; font-size: 18px; transition: color .5s, text-shadow .5s; }
+#repair-progress span.on { color: #ffe3a0; text-shadow: 0 0 12px #ffd873; }
+@media (max-width: 360px) { #repair-progress { gap: 5px; padding: 10px 8px; } #controls button { padding-inline: 10px; } }
