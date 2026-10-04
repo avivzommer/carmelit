@@ -1,14 +1,6 @@
 body { font-family: system-ui, sans-serif; }
 #controls { z-index: 3; }
 #controls #help { display: none; }
-#mobile-journey { position: fixed; z-index: 3; bottom: max(12px, env(safe-area-inset-bottom)); left: max(12px, env(safe-area-inset-left)); right: max(12px, env(safe-area-inset-right)); max-width: 440px; margin-inline: auto; padding: 17px 20px 12px; border: 1px solid #fff2; border-radius: 22px; background: #102b39ed; color: #fff4d6; box-shadow: 0 12px 35px #07172266; backdrop-filter: blur(12px); }
-.journey-heading { display: flex; justify-content: space-between; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: #c3d8da; }
-#mobile-journey h2 { font-size: 21px; margin: 9px 0 5px; font-weight: 600; }
-#mobile-journey p { font-size: 14px; line-height: 1.45; margin: 0 0 13px; color: #d6e3e3; }
-#journey-action { width: 100%; min-height: 54px; font-size: 16px; font-weight: 650; color: #183543; background: #f2d890; border: 0; border-radius: 14px; touch-action: manipulation; }
-#journey-action:disabled { color: #b8cacc; background: #294653; cursor: default; }
-#original-game { display: block; text-align: center; padding: 10px 0 2px; font-size: 12px; color: #c3d8da; }
 #world-action { position: fixed; z-index: 2; transform: translate(-50%, -100%); min-height: 52px; min-width: 120px; border: 2px solid #ffe4a1; color: #fff4d6; background: #183543ed; font-size: 14px; font-weight: 600; box-shadow: 0 4px 16px #0005; touch-action: manipulation; }
 #world-action::after { content: ''; position: absolute; bottom: -9px; left: calc(50% - 7px); border-top: 8px solid #ffe4a1; border-left: 7px solid transparent; border-right: 7px solid transparent; }
 #world-action[hidden] { display: none; }
-@media (max-height: 500px) { #mobile-journey { left: auto; width: 300px; padding: 12px 16px; } #mobile-journey p { font-size: 12px; } }

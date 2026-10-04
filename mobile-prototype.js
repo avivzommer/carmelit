@@ -176,11 +176,7 @@ introCard.setAttribute('role','dialog');introCard.setAttribute('aria-modal','tru
 const introPanel=document.createElement('section'),introCount=document.createElement('div'),introTitle=document.createElement('h1'),introText=document.createElement('p'),introNext=document.createElement('button');
 introCount.className='intro-progress';introCount.setAttribute('role','progressbar');introCount.setAttribute('aria-label','Introduction progress');introCount.setAttribute('aria-valuemin','0');introCount.setAttribute('aria-valuemax','3');
 introTitle.id='intro-title';introNext.type='button';introPanel.append(introCount,introTitle,introText,introNext);introCard.append(introPanel);document.body.append(introCard);
-const introPages=[
- ['Your shift begins','The station has lost power. You are the technician sent to restore its three repair stations and bring the line back to life.'],
- ['Make your first repair','Tap the triangle beside the blue cabinet. The technician will walk over and fix it. Tap accessible paths and platforms to move around.'],
- ['Bring the line back to life','Board through an open train door, then drag the train along the rails. Explore the underground passages and repair the remaining cabinets to light up the exit.']
-];
+const introPages=[['Your first repair','Tap the cabinet marker to walk over and restore its power. Then tap Board train to enter through the open door. Use Overview whenever you want to see the whole station.']];
 let introPage=0;
 let actionRevealTimer;
 function cancelActionReveal(){clearTimeout(actionRevealTimer);}
@@ -393,7 +389,7 @@ canvas.addEventListener('pointermove',e=>{if(pointer.move(e)){canvas.style.curso
 
 canvas.addEventListener('pointercancel',pointer.cancel);canvas.addEventListener('lostpointercapture',pointer.cancel);
 window.addEventListener('keydown',e=>{if(e.key.toLowerCase()==='r'&&!(e.target instanceof HTMLButtonElement)){prototypeDone=false;overview=false;reset();startEntrance();}});
-document.querySelector('#restart').onclick=()=>{prototypeDone=false;overview=false;reset();startEntrance();};document.querySelector('#again').onclick=reset;let hintTimer;document.querySelector('#help').onclick=()=>{hint();document.body.classList.toggle('show-hint');clearTimeout(hintTimer);hintTimer=setTimeout(()=>document.body.classList.remove('show-hint'),6000);};
+document.querySelector('#restart').onclick=()=>{prototypeDone=false;overview=false;reset();startEntrance();};document.querySelector('#again').onclick=()=>{prototypeDone=false;overview=false;reset();startEntrance();};let hintTimer;document.querySelector('#help').onclick=()=>{hint();document.body.classList.toggle('show-hint');clearTimeout(hintTimer);hintTimer=setTimeout(()=>document.body.classList.remove('show-hint'),6000);};
 // Fit both trains at both ends of their travel, including the departure, before adding scenery.
 const screenBounds=new THREE.Box2();
 function measure(){scene.updateMatrixWorld(true);camera.updateMatrixWorld(true);scene.traverse(o=>{if(!o.isMesh)return;for(let p=o;p;p=p.parent)if(p.userData.fitCamera===false)return;const bounds=new THREE.Box3().setFromObject(o);for(const x of [bounds.min.x,bounds.max.x])for(const y of [bounds.min.y,bounds.max.y])for(const z of [bounds.min.z,bounds.max.z]){const p=vector([x,y,z]).applyMatrix4(camera.matrixWorldInverse);screenBounds.expandByPoint(new THREE.Vector2(p.x,p.y));}});}
@@ -405,7 +401,7 @@ function resize(){
  const rect=canvas.getBoundingClientRect();
  renderer.setSize(rect.width,rect.height,false);
  if(overview){
-  Object.assign(camera,fittedView({x:size.x*.98,y:size.y*.98},center,rect.width,rect.height,{top:60,bottom:230,left:12,right:12}));
+  Object.assign(camera,fittedView({x:size.x*.98,y:size.y*.98},center,rect.width,rect.height,{top:72,bottom:16,left:12,right:12}));
  }else{
   const focus=person.position.clone().add(new THREE.Vector3(0,.65,0)).applyMatrix4(camera.matrixWorldInverse);
   if(!mobileCenter)mobileCenter=new THREE.Vector2(focus.x,focus.y);
@@ -416,24 +412,20 @@ function resize(){
  }
  camera.updateProjectionMatrix();
 }
-const journeyTitle=document.querySelector('#journey-title'),journeyCopy=document.querySelector('#journey-copy'),journeyAction=document.querySelector('#journey-action'),worldAction=document.querySelector('#world-action');
+const worldAction=document.querySelector('#world-action');
 function firstJourneyAction(){
  if(game.state.motion||prototypeDone||overview)return;
  if(!game.state.pressed[0])walk('station1');
  else if(game.state.location!==game.primary)walk(game.primary);
 }
-journeyAction.onclick=firstJourneyAction;worldAction.onclick=firstJourneyAction;
+worldAction.onclick=firstJourneyAction;
 document.querySelector('#overview').onclick=()=>{
  overview=!overview;document.querySelector('#overview').setAttribute('aria-pressed',String(overview));
  document.querySelector('#overview').textContent=overview?'Back to player':'Overview';resize();
 };
 function updateMobileJourney(dt){
  const motion=game.state.motion?.type,busy=Boolean(motion),repaired=game.state.pressed[0],aboard=game.state.location===game.primary;
- if(aboard&&!busy)prototypeDone=true;
- const titles=prototypeDone?['First journey complete','You arrived, restored the first cabinet, and boarded the train. This prototype stops here so we can evaluate the mobile controls.','Journey complete']:overview?['Station overview','See where you are in the station. Return to the player to continue.','Return to player']:motion==='intro'?['Your shift begins','The train is arriving. Next, tap the large button to reach your first repair.','Arriving…']:motion==='repair'?['Restoring station power','The technician is repairing the cabinet. Watch the current return to the line.','Repairing…']:motion==='walk'?['On your way',repaired?'Walking through the open train door.':'Following the platform to the repair cabinet.','Walking…']:repaired?['Power restored','Your first repair is complete. Board through the open door to finish this journey.','Board train']:['Make your first repair','Tap below or tap the cabinet marker. The technician follows the safe platform path and repairs the box.','Go to repair cabinet'];
- journeyTitle.textContent=titles[0];journeyCopy.textContent=titles[1];journeyAction.textContent=titles[2];journeyAction.disabled=busy||prototypeDone;
- journeyAction.onclick=overview?()=>document.querySelector('#overview').click():firstJourneyAction;
- document.querySelector('#journey-progress').textContent=`${prototypeDone?3:repaired?2:1} / 3`;
+ if(aboard&&!busy&&!prototypeDone){prototypeDone=true;showCompletion();}
  const focus=person.position.clone().add(new THREE.Vector3(0,.65,0)).applyMatrix4(camera.matrixWorldInverse);
  if(mobileCenter){const k=reducedMotion?1:1-Math.exp(-4*dt);mobileCenter.lerp(new THREE.Vector2(focus.x,focus.y),k);}
  mobileWidth=THREE.MathUtils.damp(mobileWidth,motion==='intro'?7.2:aboard?6.4:5.4,4,dt);resize();
@@ -466,7 +458,7 @@ function animate(){
   const t=Math.min(1,animation.time/animation.duration),kind=animation.type;
   if(kind==='intro'){
    const frame=entranceFrame(animation.time,reducedMotion);
-   if(false){
+   if(!animation.instructionsShown&&animation.time>=(reducedMotion?.6:3.5)){
     animation.instructionsShown=true;introCard.hidden=false;document.querySelector('#controls').inert=true;showIntroPage();
    }
    canvas.style.opacity=String(frame.opacity);introFocus=frame.focus;resize();
