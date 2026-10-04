@@ -1,0 +1,47 @@
+/* One viewport, including changing phone browser bars and display cutouts. */
+html { overscroll-behavior: none; }
+html, body { width: 100%; height: 100%; height: 100dvh; overflow: hidden; }
+body { position: relative; }
+body::before { content: ""; position: fixed; inset: 0; background: radial-gradient(ellipse at 50% 55%, #263a42, #142831 52%, #09151e); opacity: var(--underground-depth, 0); pointer-events: none; }
+canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+#controls { top: max(10px, env(safe-area-inset-top)); right: max(12px, env(safe-area-inset-right)); left: max(12px, env(safe-area-inset-left)); display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 6px; z-index: 2; }
+#controls button, #controls .level-link { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; margin: 0; touch-action: manipulation; }
+#controls .level-link { padding: 0 8px; }
+#status { bottom: max(12px, env(safe-area-inset-bottom)); left: max(16px, env(safe-area-inset-left)); right: max(16px, env(safe-area-inset-right)); z-index: 2; }
+#win { z-index: 4; padding: 24px; overflow: auto; }
+#win h1 { font-size: clamp(24px, 6vw, 38px); }
+@media (max-width: 600px), (max-height: 500px) {
+ #controls button { padding: 8px 12px; font-size: 12px; }
+ #controls .level-link { font-size: 11px; padding: 0 5px; }
+ #status { font-size: 12px; line-height: 1.4; letter-spacing: 0; }
+}
+
+/* Station controls float over the full-bleed playfield. */
+body[data-chapter] #controls { width: max-content; max-width: calc(100% - 24px); left: auto; padding: 4px; border-radius: 28px; background: #172d3a38; backdrop-filter: blur(8px); }
+body[data-chapter] #status { width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+body[data-chapter].show-hint #status { width: auto; height: auto; clip-path: none; top: max(76px, calc(env(safe-area-inset-top) + 66px)); bottom: auto; left: auto; right: 16px; max-width: min(320px, calc(100% - 32px)); padding: 12px 16px; border-radius: 14px; background: #172d3aeb; text-align: left; }
+
+#intro-guide { position: fixed; inset: 0; z-index: 5; display: grid; place-items: center; padding: 24px; box-sizing: border-box; overflow: auto; background: #081923bd; backdrop-filter: blur(7px); color: #fff4d6; text-align: center; font-family: system-ui; animation: intro-fade .5s ease both; }
+#intro-guide[hidden] { display: none; }
+#intro-guide section { width: min(520px, 100%); margin: auto; }
+#intro-guide .intro-progress { width: 120px; height: 4px; margin: 0 auto 28px; border-radius: 999px; background: #fff2; overflow: hidden; }
+#intro-guide .intro-progress::before { content: ""; display: block; height: 100%; width: var(--progress, 0%); background: #f2d890; border-radius: inherit; transition: width .4s ease; }
+@media (prefers-reduced-motion: reduce) { #intro-guide .intro-progress::before { transition: none; } }
+#intro-guide h1 { font-size: clamp(28px, 6vw, 46px); line-height: 1.15; font-weight: 500; margin: 22px 0; }
+#intro-guide p { font-size: clamp(16px, 3vw, 19px); line-height: 1.7; color: #e0e7e7; margin: 0 auto 32px; max-width: 460px; }
+#intro-guide button { border: 1px solid #f2d890; border-radius: 999px; padding: 14px 32px; min-height: 48px; color: #172d3a; background: #f2d890; font: 600 16px system-ui; cursor: pointer; }
+#intro-guide button:hover { background: #ffe6a4; }
+#intro-guide button:focus-visible { outline: 3px solid white; outline-offset: 5px; }
+@keyframes intro-fade { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { #intro-guide { animation: none; } }
+
+body[data-chapter] #win { background: #08192388; backdrop-filter: blur(2px); animation: intro-fade .8s ease both; padding: 24px; }
+body[data-chapter] #win h1 { font: 500 clamp(32px, 7vw, 52px)/1.15 system-ui; margin: 0 0 18px; }
+body[data-chapter] #win p { font: 18px/1.6 system-ui; max-width: 440px; }
+body[data-chapter] #win button { background: #f2d890; color: #172d3a; font-size: 16px; min-height: 48px; }
+@media (prefers-reduced-motion: reduce) { body[data-chapter] #win { animation: none; } }
+
+#intro-guide:focus, #win:focus { outline: none; }
+.completion-sparkles { position: absolute; left: 50%; top: 42%; width: 0; height: 0; pointer-events: none; }
+.completion-sparkles i { position: absolute; width: 4px; height: 7px; border-radius: 2px; background: #f5d783; box-shadow: 0 0 9px #ffdb87aa; opacity: 0; animation: completion-spark 2.4s ease-out var(--delay) both; }
+@keyframes completion-spark { 0% { opacity: 0; transform: translate(0,0) scale(.3); } 18% { opacity: .9; } 100% { opacity: 0; transform: translate(var(--x),var(--y)) rotate(120deg) scale(.5); } }

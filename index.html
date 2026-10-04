@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Haifa Underground · The Upper Line</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; }
+    body { background: radial-gradient(ellipse at 50% 58%, #e5d9b7 0%, #95b5ae 23%, #477b82 49%, #254b60 78%, #183548 100%); }
+    body::before { content: ""; position: fixed; inset: 0; background: radial-gradient(ellipse at 50% 55%, #263a42 0%, #142831 52%, #09151e 100%); opacity: var(--underground-depth, 0); pointer-events: none; }
+    body::after { content: ""; position: fixed; inset: 0; background: #dbe3d3; opacity: 0; pointer-events: none; transition: opacity .7s; }
+    body.departing::after { opacity: 1; z-index: 10; }
+    canvas { position: relative; display: block; width: 100%; height: 100%; }
+    #error { position: absolute; inset: 40% 15%; color: #fff; font: 16px/1.6 system-ui; text-align: center; }
+    #controls { position: fixed; top: 20px; right: 22px; }
+    .level-link { color: #fff4d6; font: 12px system-ui; margin-right: 14px; text-decoration: none; }
+    button { color: #fff4d6; background: #243e5c55; border: 1px solid #fff2; border-radius: 24px; padding: 10px 17px; font: 12px system-ui; cursor: pointer; backdrop-filter: blur(10px); }
+    button:hover, button:focus-visible { background: #243e5caa; outline: 2px solid #ffe2a0; outline-offset: 3px; }
+    #status { position: fixed; bottom: 24px; left: 20px; right: 20px; margin: 0; color: #fff6df; text-align: center; font: 13px/1.5 system-ui; letter-spacing: .025em; text-shadow: 0 1px 8px #183353; pointer-events: none; }
+    #win { position: fixed; inset: 0; background: #142c4366; backdrop-filter: blur(5px); display: grid; place-content: center; text-align: center; color: #fff1cd; font: 16px system-ui; }
+    #win[hidden] { display: none; }
+    #win h1 { font: 400 38px Georgia, serif; margin-bottom: 10px; }
+    #win p { margin: 0 0 28px; opacity: .85; }
+    @media (prefers-reduced-motion: reduce) { #win { backdrop-filter: none; } }
+  </style>
+  <link rel="stylesheet" href="./game-layout.css">
+  <script type="importmap">{"imports":{"three":"./vendor/three.module.js"}}</script>
+</head>
+<body data-chapter="2">
+  <canvas id="scene" aria-label="The Upper Line. Click platforms to walk. Step on repair buttons. Drag either train along the tracks. Click to board or step off. Arrow keys move trains. Keys 1 to 6 select destinations. R restarts."></canvas>
+  <div id="controls"><button id="help">Hint</button> <button id="restart" title="Restart (R)">Restart</button></div>
+  <p id="status" role="status" aria-live="polite"></p>
+  <div id="win" hidden role="dialog" aria-modal="true" aria-labelledby="win-title"><h1 id="win-title">Level complete.</h1><p>Power restored. The line is running again.</p><button id="again">Play again</button><a class="level-link" style="margin-top:20px" href="./index.html">Return to station</a></div>
+  <script type="module" src="./mechanic-level.js"></script>
+</body>
+</html>
