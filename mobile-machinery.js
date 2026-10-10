@@ -1,4 +1,5 @@
 import * as THREE from './vendor/three.module.js';
+import {TRAIN_SLOPE} from './mechanic-track.js';
 export function wheelTravel(start,angle,index){return THREE.MathUtils.clamp(start+angle/Math.PI*(index?-1:1),0,2);}
 export function carriageStep(stop,index,up){return THREE.MathUtils.clamp(stop+(up?1:-1)*(index?-1:1),0,2);}
 export function createPlatformWheel(position,index){
@@ -18,8 +19,9 @@ export function createPlatformWheel(position,index){
 export function createCabControls(train,index){
  const root=new THREE.Group();root.name='Cabin uphill and downhill controls';train.root.add(root);
  const controls=[];
- for(const [up,x,z,color]of [[true,-.48,-.85,0x9bdbbd],[false,.48,.85,0xe9c35e]]){
-  const control=new THREE.Group();control.position.set(x,.44,z);root.add(control);
+ for(const [up,x,z,color]of [[true,-.48,-.55,0x9bdbbd],[false,.20,.55,0xe9c35e]]){
+  // Each console stands on its own stepped cabin floor, clear of the roof caps.
+  const control=new THREE.Group();control.position.set(x,.22-TRAIN_SLOPE*Math.sign(z)*.7,z);root.add(control);
   const base=new THREE.Mesh(new THREE.BoxGeometry(.36,.40,.38),new THREE.MeshStandardMaterial({color:0x24465a,roughness:.6}));control.add(base);
   const material=new THREE.MeshStandardMaterial({color,emissive:color,emissiveIntensity:.35});
   const button=new THREE.Mesh(new THREE.BoxGeometry(.32,.06,.34),material);button.position.y=.23;control.add(button);

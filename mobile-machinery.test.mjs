@@ -54,13 +54,24 @@ test('forgiving object taps choose a visible nearby object without reaching thro
 
 test('mobile roof caps fade with the full roof while aboard and restore after stepping off',()=>{
  for(const index of [0,1]){
-  const train=createCarmelitTrain(index,{fullRoofCutaway:true});createCabControls(train,index);
+  const train=createCarmelitTrain(index,{fullRoofCutaway:true}),cab=createCabControls(train,index);
   const cutaway=createPlayerCutaway([train.root]),camera=new THREE.OrthographicCamera(-3,3,3,-3,.1,100);
-  camera.position.set(11,13,15);camera.lookAt(0,0,0);camera.updateMatrixWorld();train.root.updateMatrixWorld(true);
+  camera.position.set(24,24*Math.SQRT2,24);camera.lookAt(0,0,0);camera.updateMatrixWorld();train.root.updateMatrixWorld(true);
   const panels=[...train.roof.children,...train.roofEdges];
   train.updateBoarding(1,'station1',true,0,true);
   for(let frame=0;frame<120;frame++)cutaway.update(camera,new THREE.Vector3(),1/60);
   for(const panel of panels){assert.ok(panel.material.opacity<.13,'every roof panel and edge must reveal the controls');assert.equal(panel.castShadow,false);assert.equal(panel.material.depthWrite,false);}
+  for(const control of cab.controls){
+   const target=control.root.localToWorld(new THREE.Vector3(0,.27,0)),direction=new THREE.Vector3();camera.getWorldDirection(direction);
+   const ray=new THREE.Raycaster(target.clone().addScaledVector(direction,-10),direction);
+   const first=ray.intersectObject(train.root,true).find(hit=>hit.object.isMesh&&(hit.object.userData.cutawayOpacity??1)>.35);
+   assert.ok(first,'control must be visible from the game camera');
+   let owner=first.object;while(owner&&owner!==control.root)owner=owner.parent;
+   assert.ok(owner===control.root,`no solid train panel may cover ${control.up?'uphill':'downhill'} control (hit ${first.object.name||first.object.geometry.type})`);
+   assert.ok(Math.abs(control.root.position.z)+.19<.805,'consoles stay inside the roof-cap edges');
+   const floorY=-.4*Math.sign(control.root.position.z)*.7;
+   assert.ok(Math.abs(control.root.position.y-.20-floorY-.02)<.001,'console rests on its own cabin floor step');
+  }
   train.updateBoarding(1,'station1',false,0,true);
   for(let frame=0;frame<120;frame++)cutaway.update(camera,new THREE.Vector3(4,0,0),1/60);
   for(const panel of panels){assert.equal(panel.material.opacity,1);assert.equal(panel.castShadow,true);assert.equal(panel.material.depthWrite,true);}

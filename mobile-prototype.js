@@ -1,5 +1,5 @@
 import {closestTouchTarget} from './mobile-interaction.js';
-import {createPlatformWheel,createCabControls,addCabinetWrench,createInteractionHalo,wheelTravel,carriageStep} from './mobile-machinery.js';
+import {createPlatformWheel,createCabControls,addCabinetWrench,createInteractionHalo,wheelTravel,carriageStep} from './mobile-machinery.js?cabin-controls=2';
 import {createFloorWalker} from './mobile-wander.js';
 import {createRunout,createDepartureRunout,applyDepartureFade} from './mechanic-runout.js';
 import * as THREE from 'three';
