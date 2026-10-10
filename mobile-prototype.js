@@ -12,7 +12,7 @@ import {createRestoration} from './mechanic-restoration.js';
 import {createTrack,trainPosition,STATION_Y,TERMINAL_Z,LINE_CLIP_PLANES,departureTravel,deckHeightAtZ} from './mechanic-track.js';
 
 import {createRepairCabinet} from './mechanic-repair.js';
-import {createCarmelitTrain} from './mechanic-train.js';
+import {createCarmelitTrain} from './mechanic-train.js?mobile-roof=full';
 import {createUndergroundAtmosphere} from './mechanic-atmosphere.js';
 import {fittedView,restorationReveal,entranceFrame} from './mechanic-presentation.mjs';
 import {addBackgroundScenery} from './scenery.js';
@@ -239,7 +239,7 @@ function tag(object,key,value){object.traverse(o=>{if(o.isMesh)o.userData[key]=v
 // Orange-red Carmelit trains, with doors that identify the platform side.
 const trainModels=[];
 for(let i=0;i<2;i++){
- const train=createCarmelitTrain(i);scene.add(train.root);carriages.push(train.root);trainModels.push(train);
+ const train=createCarmelitTrain(i,{fullRoofCutaway:true});scene.add(train.root);carriages.push(train.root);trainModels.push(train);
  if(chapter===2)train.root.traverse(o=>{if(o.isMesh)for(const mat of Array.isArray(o.material)?o.material:[o.material]){applyDepartureFade(mat);mat.clipShadows=true;}});
 }
 function updateBoarding(dt=0){

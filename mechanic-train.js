@@ -2,7 +2,7 @@ import * as THREE from './vendor/three.module.js';
 import {TRAIN_SLOPE,TRACK_CLEARANCE} from './mechanic-track.js';
 
 // A Carmelit-inspired shell with a camera-side cutaway around the mechanic.
-export function createCarmelitTrain(index){
+export function createCarmelitTrain(index,{fullRoofCutaway=false}={}){
  const root=new THREE.Group();root.name=`Carmelit train ${index+1}`;
  const body=new THREE.Group();body.name='Inclined train shell';root.add(body);
  body.matrixAutoUpdate=false;body.matrix.set(1,0,0,0, 0,1,-TRAIN_SLOPE,0, 0,0,1,0, 0,0,0,1);
@@ -17,7 +17,7 @@ export function createCarmelitTrain(index){
  const navy=new THREE.MeshStandardMaterial({color:0x213d67,roughness:.6});
  const floor=new THREE.MeshStandardMaterial({color:0xe1ddc8,roughness:.9});
  const cream=new THREE.MeshStandardMaterial({color:0xffefd4,roughness:.65});
- const headlights=[],doors=[];
+ const headlights=[],doors=[],roofEdges=[];
  function part(geometry,material,x,y,z,parent=body){const m=new THREE.Mesh(geometry,material);m.position.set(x,y,z);m.castShadow=m.receiveShadow=true;parent.add(m);return m;}
  function box(x,y,z,w,h,d,mat,parent=body){return part(new THREE.BoxGeometry(w,h,d),mat,x,y,z,parent);}
  function rounded(w,h,r,depth,mat,x,y,z,parent=body){
@@ -53,7 +53,7 @@ export function createCarmelitTrain(index){
  const reflection=new THREE.MeshStandardMaterial({color:0x769c9d,roughness:.15,transparent:true,opacity:.34,depthWrite:false});
  const gleam=box(-.29,.39,1.176,.025,.34,.005,reflection,nose);gleam.rotation.z=-.50;
  const wiper=box(.25,.195,1.179,.43,.014,.012,rubber,nose);wiper.rotation.z=.22;
- box(0,1.02,1.005,1.46,.055,.40,paint,nose);
+ roofEdges.push(box(0,1.02,1.005,1.46,.055,.40,paint,nose));
  rounded(1.39,.19,.03,.02,navy,0,-.06,1.142,nose);
  const stripe=box(0,-.06,1.168,.042,.17,.018,yellow,nose);stripe.rotation.z=-.65;
  const stripe2=box(.075,-.06,1.168,.025,.17,.018,yellow,nose);stripe2.rotation.z=-.65;
@@ -69,7 +69,7 @@ export function createCarmelitTrain(index){
  box(0,.48,-1.065,1.46,1.03,.06,paint);
  rounded(1.2,.70,.04,.025,windowTrim,0,.52,-1.022);
  rounded(1.1,.62,.03,.014,glass,0,.52,-.991);
- box(0,1.035,-.89,1.48,.07,.42,paint);
+ roofEdges.push(box(0,1.035,-.89,1.48,.07,.42,paint));
  // The roof fades while occupied. Both orange side walls remain real geometry
  // with an opening only at the sliding passenger doors.
  const roof=new THREE.Group();roof.name='Passenger roof';roof.userData.occupancyRoof=true;roof.userData.viewOpacity=1;body.add(roof);
@@ -91,7 +91,7 @@ export function createCarmelitTrain(index){
    box(side*.721,-.009,z,.078,.057,.67,aluminium);
   }
   for(const z of [-.373,.373])box(side*.715,.492,z,.065,1.024,.057,paint);
-  box(side*.715,1.015,0,.065,.04,.815,paint);
+  roofEdges.push(box(side*.715,1.015,0,.065,.04,.815,paint));
   const door=new THREE.Group();body.add(door);
   const leaves=[];
   for(const half of [-1,1]){
@@ -117,6 +117,7 @@ export function createCarmelitTrain(index){
   cue.visible=false;
   doors.push({side,door,leaves,step,cue,light,open:0});
  }
+ if(fullRoofCutaway)for(const edge of roofEdges){edge.userData.occupancyRoof=true;edge.userData.viewOpacity=1;}
  root.traverse(o=>{if(o.isMesh){o.userData.destination=index?'carB':'carA';o.userData.trainIndex=index;}});
  let activeSide=0,activeLanding=null;
  function containsPassenger(position){
@@ -125,6 +126,7 @@ export function createCarmelitTrain(index){
  }
  function updateBoarding(side,landing,inside,dt,power){
   roof.userData.viewOpacity=inside?.12:1;
+  if(fullRoofCutaway)for(const edge of roofEdges)edge.userData.viewOpacity=roof.userData.viewOpacity;
   activeSide=landing?side:0;activeLanding=landing;
   for(const d of doors){
    const open=Boolean(landing&&side===d.side),destination=inside?landing:(index?'carB':'carA');
@@ -136,5 +138,5 @@ export function createCarmelitTrain(index){
   }
   headlights.forEach(m=>m.emissiveIntensity=power?.8:.08);
  }
- return {root,body,nose,roof,sidePanels,doors,containsPassenger,updateBoarding,get boarding(){return {side:activeSide,landing:activeLanding};}};
+ return {root,body,nose,roof,roofEdges,sidePanels,doors,containsPassenger,updateBoarding,get boarding(){return {side:activeSide,landing:activeLanding};}};
 }

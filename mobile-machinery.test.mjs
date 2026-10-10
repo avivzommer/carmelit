@@ -5,7 +5,7 @@ import {createMechanicLayout} from './mechanic-layout.js';
 import {createSteppedStation} from './mechanic-station.js';
 import {createCarmelitTrain} from './mechanic-train.js';
 import {createRepairCabinet} from './mechanic-repair.js';
-import {createWalkGuard} from './mechanic-clearance.js';
+import {createWalkGuard,createPlayerCutaway} from './mechanic-clearance.js';
 import {createPlatformWheel,createCabControls,addCabinetWrench,wheelTravel,carriageStep} from './mobile-machinery.js';
 import {createFloorWalker} from './mobile-wander.js';
 import {closestTouchTarget} from './mobile-interaction.js';
@@ -20,7 +20,7 @@ test('wheel direction reverses carts, allows wrong-way travel and clamps endpoin
 });
 test('physical wheel approaches remain clear while both carts move, and deck wandering avoids cabinets',()=>{
  const layout=createMechanicLayout(2),station=createSteppedStation(layout);layout.serviceWheel.visible=false;
- const trains=[0,1].map(i=>createCarmelitTrain(i));trains.forEach(createCabControls);
+ const trains=[0,1].map(i=>createCarmelitTrain(i,{fullRoofCutaway:true}));trains.forEach(createCabControls);
  const cabinets=['station1','station2Far','repair'].map((id,i)=>{const c=createRepairCabinet(i);c.root.position.copy(layout.cabinetPosition(id));addCabinetWrench(c);return c;});
  const specs=[['station1',4.4,4.1,3.90,4.1],['station2Far',-3.85,-2.65,-3.35,-2.65],['station2Near',3.85,-2.65,3.35,-2.65],['dockFar',-3.42,.4,-2.90,.35],['dockNear',3.42,.4,2.90,.35]];
  const wheels=specs.map(([id,x,z],i)=>createPlatformWheel(new THREE.Vector3(x,layout.floors[id][1],z),i));
@@ -50,4 +50,21 @@ test('forgiving object taps choose a visible nearby object without reaching thro
  assert.equal(closestTouchTarget({x:141,y:100},targets,visible).id,'door');
  assert.equal(closestTouchTarget({x:100,y:140},targets,visible),null);
  assert.equal(closestTouchTarget({x:115,y:100},targets,()=>false),null);
+});
+
+test('mobile roof caps fade with the full roof while aboard and restore after stepping off',()=>{
+ for(const index of [0,1]){
+  const train=createCarmelitTrain(index,{fullRoofCutaway:true});createCabControls(train,index);
+  const cutaway=createPlayerCutaway([train.root]),camera=new THREE.OrthographicCamera(-3,3,3,-3,.1,100);
+  camera.position.set(11,13,15);camera.lookAt(0,0,0);camera.updateMatrixWorld();train.root.updateMatrixWorld(true);
+  const panels=[...train.roof.children,...train.roofEdges];
+  train.updateBoarding(1,'station1',true,0,true);
+  for(let frame=0;frame<120;frame++)cutaway.update(camera,new THREE.Vector3(),1/60);
+  for(const panel of panels){assert.ok(panel.material.opacity<.13,'every roof panel and edge must reveal the controls');assert.equal(panel.castShadow,false);assert.equal(panel.material.depthWrite,false);}
+  train.updateBoarding(1,'station1',false,0,true);
+  for(let frame=0;frame<120;frame++)cutaway.update(camera,new THREE.Vector3(4,0,0),1/60);
+  for(const panel of panels){assert.equal(panel.material.opacity,1);assert.equal(panel.castShadow,true);assert.equal(panel.material.depthWrite,true);}
+ }
+ const original=createCarmelitTrain(0);original.updateBoarding(1,'station1',true,0,true);
+ assert.ok(original.roofEdges.every(edge=>edge.userData.viewOpacity===undefined),'original level keeps its existing roof treatment');
 });
