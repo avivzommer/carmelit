@@ -10,7 +10,7 @@ Validate gameplay: `node --test visual-study/mechanic*.test.mjs` from the parent
 
 ## Mobile prototype
 
-`mobile-prototype.html` keeps a close camera with tap-to-walk exploration. Repair the three blue cabinets, turn platform handwheels to call the cable-linked carts, then board and use the cabin uphill/downhill controls. Wheel travel reverses the two carts and settles at a platform stop when released. The original level is unchanged.
+`mobile-prototype.html` keeps a close camera with tap-to-walk exploration. Tap the three blue cabinets to repair them, approach and turn the physical platform handwheels to call the cable-linked carts, then tap an open doorway to board and use the cabin arrow controls. Gameplay has no floating text buttons or separate wheel panel. Wheel travel reverses the two carts and settles at a platform stop when released. The original level is unchanged.
 
 Validate the mobile machinery and walking clearance with `node --test visual-study/mobile-machinery.test.mjs` from the parent directory.
 

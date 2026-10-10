@@ -6,8 +6,9 @@ import {createSteppedStation} from './mechanic-station.js';
 import {createCarmelitTrain} from './mechanic-train.js';
 import {createRepairCabinet} from './mechanic-repair.js';
 import {createWalkGuard} from './mechanic-clearance.js';
-import {createPlatformWheel,createCabControls,wheelTravel,carriageStep} from './mobile-machinery.js';
+import {createPlatformWheel,createCabControls,addCabinetWrench,wheelTravel,carriageStep} from './mobile-machinery.js';
 import {createFloorWalker} from './mobile-wander.js';
+import {closestTouchTarget} from './mobile-interaction.js';
 import {createMechanicJourney} from './mechanic-state.mjs';
 import {trainPosition} from './mechanic-track.js';
 
@@ -20,8 +21,8 @@ test('wheel direction reverses carts, allows wrong-way travel and clamps endpoin
 test('physical wheel approaches remain clear while both carts move, and deck wandering avoids cabinets',()=>{
  const layout=createMechanicLayout(2),station=createSteppedStation(layout);layout.serviceWheel.visible=false;
  const trains=[0,1].map(i=>createCarmelitTrain(i));trains.forEach(createCabControls);
- const cabinets=['station1','station2Far','repair'].map((id,i)=>{const c=createRepairCabinet(i);c.root.position.copy(layout.cabinetPosition(id));return c;});
- const specs=[['station1',4.4,4.1,3.95,4.1],['station2Far',-3.85,-2.65,-3.35,-2.65],['station2Near',3.85,-2.65,3.35,-2.65],['dockFar',-3.42,.4,-2.95,.35],['dockNear',3.42,.4,2.95,.35]];
+ const cabinets=['station1','station2Far','repair'].map((id,i)=>{const c=createRepairCabinet(i);c.root.position.copy(layout.cabinetPosition(id));addCabinetWrench(c);return c;});
+ const specs=[['station1',4.4,4.1,3.90,4.1],['station2Far',-3.85,-2.65,-3.35,-2.65],['station2Near',3.85,-2.65,3.35,-2.65],['dockFar',-3.42,.4,-2.90,.35],['dockNear',3.42,.4,2.90,.35]];
  const wheels=specs.map(([id,x,z],i)=>createPlatformWheel(new THREE.Vector3(x,layout.floors[id][1],z),i));
  const guard=createWalkGuard([layout.root,station.root,...trains.map(t=>t.root),...cabinets.map(c=>c.root),...wheels.map(w=>w.root)]);
  const walker=createFloorWalker(layout.surfaces,guard);layout.updateGates([true,true,true]);
@@ -40,4 +41,13 @@ test('physical wheel approaches remain clear while both carts move, and deck wan
  }
  const from=new THREE.Vector3(...layout.floors.station1),rail=new THREE.Vector3(1.25,from.y,3);
  assert.equal(walker.path(from,rail),null,'free walking cannot enter the track void');
+});
+
+test('forgiving object taps choose a visible nearby object without reaching through scenery',()=>{
+ const targets=[{id:'cabinet behind wall',x:100,y:100},{id:'wheel',x:115,y:100},{id:'door',x:150,y:100}];
+ const visible=t=>t.id!=='cabinet behind wall';
+ assert.equal(closestTouchTarget({x:100,y:100},targets,visible).id,'wheel');
+ assert.equal(closestTouchTarget({x:141,y:100},targets,visible).id,'door');
+ assert.equal(closestTouchTarget({x:100,y:140},targets,visible),null);
+ assert.equal(closestTouchTarget({x:115,y:100},targets,()=>false),null);
 });

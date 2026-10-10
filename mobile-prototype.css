@@ -1,18 +1,7 @@
 body { font-family: system-ui, sans-serif; }
 #controls { z-index: 3; }
+#controls #overview, #controls #restart { width: 44px; padding: 0; font-size: 24px; }
 #controls #help { display: none; }
-#machine-markers button { position: fixed; z-index: 2; transform: translate(-50%,-100%); min-height: 44px; padding: 8px 12px; font-size: 12px; white-space: nowrap; font-weight: 600; color: #fff4d6; background: #173b4ae6; border: 1px solid #f2d890aa; touch-action: manipulation; }
-#machine-markers button[hidden], #wheel-dial[hidden] { display: none; }
-#wheel-dial { position: fixed; z-index: 4; width: 176px; transform: translate(-50%,-50%); padding: 10px; border: 1px solid #e8c87688; border-radius: 24px; color: #fff4d6; background: #102b39f5; box-shadow: 0 12px 35px #0008; text-align: center; }
-#wheel-close { position: absolute; right: -12px; top: -12px; width: 44px; height: 44px; padding: 0; background: #173b4a; font-size: 22px; }
-#wheel-position { padding: 4px 0 8px; font-size: 12px; }
-#dial-face { width: 140px; height: 140px; margin: auto; touch-action: none; cursor: grab; }
-#dial-face svg { width: 100%; height: 100%; overflow: visible; }
-#dial-rotor { transform-origin: 60px 60px; fill: none; stroke: #e8bd49; stroke-width: 7; }
-#dial-rotor .hub { fill: #385365; stroke-width: 4; } #dial-rotor .grip { fill: #ffe2a0; stroke: #102b39; stroke-width: 2; }
-.wheel-keys { display: flex; align-items: center; justify-content: space-between; }
-.wheel-keys button { min-width: 44px; min-height: 44px; padding: 0; font-size: 24px; }
-.wheel-keys span { font-size: 10px; line-height: 1.5; color: #c5d7d8; }
 #repair-progress { position: fixed; z-index: 3; top: max(14px, env(safe-area-inset-top)); left: max(12px, env(safe-area-inset-left)); display: flex; gap: 8px; padding: 10px 12px; border-radius: 24px; background: #102b39cc; }
 #repair-progress span { color: #72858a; font-size: 18px; transition: color .5s, text-shadow .5s; }
 #repair-progress span.on { color: #ffe3a0; text-shadow: 0 0 12px #ffd873; }
