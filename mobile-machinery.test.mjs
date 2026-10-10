@@ -19,7 +19,7 @@ test('wheel direction reverses carts, allows wrong-way travel and clamps endpoin
  assert.equal(carriageStep(1,1,true),0);assert.equal(carriageStep(1,0,true),2);
 });
 test('physical wheel approaches remain clear while both carts move, and deck wandering avoids cabinets',()=>{
- const layout=createMechanicLayout(2),station=createSteppedStation(layout);layout.serviceWheel.visible=false;
+ const layout=createMechanicLayout(2,{serviceStairX:3.8}),station=createSteppedStation(layout);layout.serviceWheel.visible=false;
  const trains=[0,1].map(i=>createCarmelitTrain(i,{fullRoofCutaway:true}));trains.forEach(createCabControls);
  const cabinets=['station1','station2Far','repair'].map((id,i)=>{const c=createRepairCabinet(i);c.root.position.copy(layout.cabinetPosition(id));addCabinetWrench(c);return c;});
  const specs=[['station1',4.4,4.1,3.90,4.1],['station2Far',-3.85,-2.65,-3.35,-2.65],['station2Near',3.85,-2.65,3.35,-2.65],['dockFar',-3.42,.4,-2.90,.35],['dockNear',3.42,.4,2.90,.35]];
@@ -41,6 +41,36 @@ test('physical wheel approaches remain clear while both carts move, and deck wan
  }
  const from=new THREE.Vector3(...layout.floors.station1),rail=new THREE.Vector3(1.25,from.y,3);
  assert.equal(walker.path(from,rail),null,'free walking cannot enter the track void');
+});
+
+test('mobile boarding and walking never auto-repair cabinets',()=>{
+ const game=createMechanicJourney(2,{autoRepair:false});
+ assert.deepEqual(game.walk('carB'),['entrance','station1','carB']);
+ game.finishWalk();assert.equal(game.state.location,'carB');assert.equal(game.state.motion,null);
+ assert.deepEqual(game.state.pressed,[false,false,false]);assert.equal(game.beginDrag(),false,'unrepaired power still prevents driving');
+ assert.ok(game.walk('station1'));game.finishWalk();assert.equal(game.state.motion,null);
+ assert.ok(game.walk('carB'));game.finishWalk();assert.equal(game.state.location,'carB');
+ game.state.stop=0;assert.ok(game.walk('station2Far'));game.finishWalk();assert.equal(game.state.location,'station2Far');assert.equal(game.state.motion,null);
+ assert.deepEqual(game.state.pressed,[false,false,false]);
+});
+
+test('mobile stair taps stop at the chosen tread and allow returning before finishing the passage',()=>{
+ const layout=createMechanicLayout(2,{serviceStairX:3.8}),station=createSteppedStation(layout);
+ layout.serviceWheel.visible=false;layout.updateGates([true,true,true]);
+ const guard=createWalkGuard([layout.root,station.root]),walker=createFloorWalker(layout.surfaces,guard,{waypoints:[...layout.stairPaths.values(),...layout.upperStairPaths.values()].flat()});
+ for(const id of ['dockFar','dockNear']){
+  const stairs=layout.stairPaths.get(id),from=new THREE.Vector3(...layout.floors[id]),tread=new THREE.Vector3(...stairs[6]);
+  assert.equal(Math.abs(stairs[1][0]),3.8,'stair mouth is on the outside edge of the platform');
+  const path=walker.path(from,tread);assert.ok(path,`${id} chosen tread is reachable`);
+  assert.ok(path.at(-1).distanceTo(tread)<.001,'tap must not automatically finish the stair route');
+  assert.ok(path.at(-1).distanceTo(new THREE.Vector3(...layout.floors.repair))>2,'repair room is not selected implicitly');
+  assert.ok(walker.path(tread,from),'player can change their mind and return upstairs');
+ }
+ const rear=layout.upperStairPaths.get(1),top=new THREE.Vector3(...rear[0]),tread=new THREE.Vector3(...rear[6]);
+ assert.ok(walker.path(top,tread),'upper passage can be entered only as far as the clicked step');
+ assert.ok(walker.path(tread,top),'upper passage allows turning back');
+ layout.updateGates([false,false,false]);guard.refresh();
+ assert.equal(walker.path(new THREE.Vector3(...layout.floors.dockNear),new THREE.Vector3(...layout.stairPaths.get('dockNear')[6])),null,'free exploration respects the closed entrance barrier');
 });
 
 test('forgiving object taps choose a visible nearby object without reaching through scenery',()=>{

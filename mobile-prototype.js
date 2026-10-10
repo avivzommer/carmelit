@@ -1,10 +1,10 @@
 import {closestTouchTarget} from './mobile-interaction.js';
 import {createPlatformWheel,createCabControls,addCabinetWrench,createInteractionHalo,wheelTravel,carriageStep} from './mobile-machinery.js?cabin-controls=2';
-import {createFloorWalker} from './mobile-wander.js';
+import {createFloorWalker} from './mobile-wander.js?free-walk=1';
 import {createRunout,createDepartureRunout,applyDepartureFade} from './mechanic-runout.js';
 import * as THREE from 'three';
-import {createMechanicJourney} from './mechanic-state.mjs';
-import {createMechanicLayout} from './mechanic-layout.js';
+import {createMechanicJourney} from './mechanic-state.mjs?free-walk=1';
+import {createMechanicLayout} from './mechanic-layout.js?free-walk=1';
 import {createSteppedStation} from './mechanic-station.js';
 import {createWalkGuard,createPlayerCutaway,cabinetWorkOffset} from './mechanic-clearance.js';
 import {advanceWalkStep} from './mechanic-walk.js';
@@ -162,11 +162,11 @@ function updateGait(dt,distance,climbing) {
   person.rotation.y+=delta*(1-Math.exp(-12*dt));
 }
 
-const game=createMechanicJourney(chapter),status=document.querySelector('#status'),win=document.querySelector('#win');
+const game=createMechanicJourney(chapter,{autoRepair:false}),status=document.querySelector('#status'),win=document.querySelector('#win');
 const near=chapter===2?1:-1;
 const HIGH=STATION_Y[2];
 const carriages=[],buttons=[],signals=[],cabinets=[],powerPulses=[];
-const layout=createMechanicLayout(chapter,{box,mesh});scene.add(layout.root);
+const layout=createMechanicLayout(chapter,{box,mesh,serviceStairX:3.8});scene.add(layout.root);
 const station=chapter===2?createSteppedStation(layout):null;
 if(station)scene.add(station.root);
 const {floors}=layout;
@@ -180,7 +180,7 @@ introCard.setAttribute('role','dialog');introCard.setAttribute('aria-modal','tru
 const introPanel=document.createElement('section'),introCount=document.createElement('div'),introTitle=document.createElement('h1'),introText=document.createElement('p'),introNext=document.createElement('button');
 introCount.className='intro-progress';introCount.setAttribute('role','progressbar');introCount.setAttribute('aria-label','Introduction progress');introCount.setAttribute('aria-valuemin','0');introCount.setAttribute('aria-valuemax','3');
 introTitle.id='intro-title';introNext.type='button';introPanel.append(introCount,introTitle,introText,introNext);introCard.append(introPanel);document.body.append(introCard);
-const introPages=[['Bring the line back to life','Tap the floor to walk. Tap a blue cabinet with a wrench to repair it. Tap a yellow wheel to approach, then turn it with your finger to call a cart. Tap an open doorway to board or step off. Inside, tap the up or down arrow on the controls. Restore all three cabinets to open the exit.']];
+const introPages=[['Bring the line back to life','Tap a floor or stair to choose where to walk. Tap again to change direction or turn back. Repairs happen only when you tap a blue cabinet with a wrench. You can board an open cart before fixing the power, but it will not move yet. Turn platform wheels to call carts; use the arrow controls inside to ride. Restore all three cabinets to open the exit.']];
 let introPage=0;
 let actionRevealTimer;
 function cancelActionReveal(){clearTimeout(actionRevealTimer);}
@@ -326,10 +326,10 @@ function paintRouteArrow(from,to,destination,layer){
  const shape=new THREE.Shape();shape.moveTo(-.055,-.16);shape.lineTo(.055,-.16);shape.lineTo(.055,.015);shape.lineTo(.15,.015);shape.lineTo(0,.19);shape.lineTo(-.15,.015);shape.lineTo(-.055,.015);shape.closePath();
  const arrow=new THREE.Mesh(new THREE.ShapeGeometry(shape),new THREE.MeshBasicMaterial({color:0xf1d57e,transparent:true,opacity:.7,side:THREE.DoubleSide,depthWrite:false}));
  arrow.position.copy(vector(from));arrow.position.y+=.04;arrow.rotation.set(-Math.PI/2,0,Math.atan2(to[0]-from[0],from[2]-to[2]));
- arrow.userData.navigationDestination=destination;arrow.userData.visualEffect=true;arrow.userData.focusLayer=layer;scene.add(arrow);routeArrows.push(arrow);
+ arrow.userData.navigationPoint=to;arrow.userData.navigationZone=destination;arrow.userData.visualEffect=true;arrow.userData.focusLayer=layer;scene.add(arrow);routeArrows.push(arrow);
 }
-for(const path of layout.upperStairPaths.values())paintRouteArrow(path[0],path[1],'upperPassage','rear');
-for(const [id,path]of layout.stairPaths){paintRouteArrow(path[0],path[1],'stairs:'+id,'service');paintRouteArrow(path.at(-1),path.at(-2),id,'service');}
+for(const path of layout.upperStairPaths.values())paintRouteArrow(path[0],path[3],'upperPassage','rear');
+for(const [id,path]of layout.stairPaths){paintRouteArrow(path[1],path[4],'stairs:'+id,'service');paintRouteArrow(path.at(-1),path.at(-3),'stairs:'+id,'service');}
 const repairTool=new THREE.Group();arms[1].elbow.add(repairTool);
 mesh(new THREE.BoxGeometry(.014,.07,.014),steel,0,-.11,.02,repairTool);
 mesh(new THREE.TorusGeometry(.022,.006,6,12,Math.PI*1.5),steel,0,-.157,.02,repairTool);
@@ -339,7 +339,7 @@ const clearanceRoots=[...architecture,...carriages,...cabinets.map(c=>c.root),re
 person.userData.alwaysVisible=true;
 const walkGuard=createWalkGuard(clearanceRoots),cutaway=createPlayerCutaway([scene],{passages:layout.passages});
 let travel=game.low,animation=null,repairRequested=false,afterWalk=null,activeWheel=null,activeCabDirection=null;
-const floorWalker=createFloorWalker(layout.surfaces,walkGuard);
+const floorWalker=createFloorWalker(layout.surfaces,walkGuard,{waypoints:[...layout.stairPaths.values(),...layout.upperStairPaths.values()].flat()});
 function point(id){if(id==='carA'||id==='carB')return carriages[id==='carA'?0:1].position.clone();return vector(floors[id]);}
 function positions(t){travel=t;carriages.forEach((car,i)=>car.position.copy(trainPosition(i,t)));if(['carA','carB'].includes(game.state.location))person.position.copy(point(game.state.location));}
 function hint(){say(game.state.complete?'Level complete.':!game.state.pressed[0]?'Explore the platform and repair the blue power cabinet.':'Tap floors to explore. Turn a platform wheel to move the paired carts, or board and use the cabin controls.');}
@@ -364,7 +364,8 @@ function walk(id){
 }
 function nextStep(){
  if(!animation.points.length){
-  game.finishWalk();animation=null;if(game.state.motion?.type==='repair'&&!repairRequested)game.state.motion=null;
+  game.finishWalk();animation=null;
+  if(repairRequested&&repairIds.includes(game.state.location)&&!game.state.pressed[repairIds.indexOf(game.state.location)]&&!game.state.motion)game.state.motion={type:'repair',index:repairIds.indexOf(game.state.location)};
   if(game.state.motion?.type==='repair'){
    const index=game.state.motion.index,cabinet=cabinets[index],from=person.position.clone();
    const work=cabinet.root.position.clone().add(cabinetWorkOffset);
@@ -382,42 +383,40 @@ function pointerRay(e){const r=canvas.getBoundingClientRect();ndc.set((e.clientX
 function interactiveHit(e){
  pointerRay(e);
  for(const h of raycaster.intersectObjects(scene.children,true)){
-  if(!h.object.isMesh||h.object.userData.visualEffect&&!h.object.userData.navigationDestination||h.object.userData.cutawayOpacity<.35)continue;
+  if(!h.object.isMesh||h.object.userData.visualEffect&&!h.object.userData.navigationPoint||h.object.userData.cutawayOpacity<.35)continue;
   let hidden=false;for(let p=h.object;p;p=p.parent)if(p===person||!p.visible)hidden=true;if(hidden)continue;
   const d=h.object.userData;
-  if(d.navigationDestination)return {destination:d.navigationDestination};
+  if(d.navigationPoint)return {floor:vector(d.navigationPoint),zone:d.navigationZone};
   if(d.platformWheel!==undefined)return {wheel:d.platformWheel};
   if(d.cabDirection!==undefined)return game.state.location===(d.trainIndex?'carB':'carA')?{up:d.cabDirection}:{destination:d.trainIndex?'carB':'carA'};
   if(d.trainIndex!==undefined)return {destination:d.destination};
   if(d.destination&&cabinets.some(c=>{let p=h.object;while(p){if(p===c.root)return true;p=p.parent;}return false;}))return {repair:d.destination};
   // A visible floor resolves to a real deck, rather than a tagged wall or rail.
   if(h.face?.normal.y>.8&&d.destination)return {floor:h.point,zone:d.destination};
-  if(d.destination?.startsWith('stairs:'))return {destination:d.destination};
   break;
  }
  return null;
 }
-function requestWalk(id,repair=false,done=null){if(game.state.motion||game.state.complete)return;closeWheel();repairRequested=repair;afterWalk=done;if(repair&&id===game.state.location&&person.position.distanceTo(point(id))>.04){afterWalk=()=>requestWalk(id,true,done);startWander(point(id));}else walk(id);}
-function startWander(to){
+function cancelWander(){if(animation?.type==='wander'){animation=null;game.state.motion=null;afterWalk=null;repairRequested=false;}}
+function requestWalk(id,repair=false,done=null){
+ cancelWander();if(game.state.motion||game.state.complete)return;closeWheel();repairRequested=repair;afterWalk=done;
+ if(floors[id]&&!game.state.location.startsWith('car')){startWander(point(id),id,()=>{if(repair)walk(id);else done?.();});return;}
+ walk(id);
+}
+function startWander(to,zone=null,done=afterWalk){
  const points=floorWalker.path(person.position,to);if(!points){say('That spot is blocked or outside the walking path.');return;}
- game.state.motion={type:'wander'};animation={type:'wander',points};nextWander();
+ afterWalk=done;game.state.motion={type:'wander'};animation={type:'wander',points,zone};nextWander();
 }
 function nextWander(){
- if(!animation.points.length){animation=null;game.state.motion=null;const done=afterWalk;afterWalk=null;done?.();return;}
+ if(!animation.points.length){const zone=animation.zone;if(floors[zone])game.state.location=zone;animation=null;game.state.motion=null;const done=afterWalk;afterWalk=null;done?.();return;}
  const to=animation.points.shift(),from=person.position.clone(),d=to.clone().sub(from);
  Object.assign(animation,{from,to,time:0,duration:Math.max(.08,from.distanceTo(to)/1.55)});desiredHeading=Math.atan2(d.x,d.z);
 }
 function exploreFloor(to,zone){
- if(game.state.motion||game.state.location.startsWith('car'))return;
+ cancelWander();if(game.state.motion||game.state.location.startsWith('car'))return;
  closeWheel();repairRequested=false;afterWalk=null;
- if(zone==='upperPassage'){requestWalk(game.state.location==='station2Far'?'station2Near':'station2Far');return;}
- if(zone.startsWith('stairs:')){requestWalk(zone);return;}
  to.y=layout.surfaces.reduce((best,s)=>Math.abs(s.y-to.y)<Math.abs(best-to.y)?s.y:best,layout.surfaces[0].y);
- const here=game.state.location==='entrance'?'station1':game.state.location;
- if(floors[zone]&&zone!==here){requestWalk(zone,false,()=>startWander(to));return;}
- const local=floorWalker.path(person.position,to);
- if(local){game.state.motion={type:'wander'};animation={type:'wander',points:local};nextWander();}
-
+ startWander(to,zone);
 }
 function touchTargets(){
  const targets=[],location=game.state.location,aboard=location.startsWith('car');
@@ -450,7 +449,7 @@ function inputHit(e){
 }
 let tapStart=null;
 canvas.addEventListener('pointerdown',e=>{
- if(game.state.motion||overview)return;
+ if(game.state.motion&&game.state.motion.type!=='wander'||overview)return;
  const h=inputHit(e);
  if(activeWheel!==null&&h?.wheel===activeWheel){
   if(!beginWheel())return;e.preventDefault();wheelGesture={id:e.pointerId,last:wheelAngle(e),total:0,start:travel};canvas.setPointerCapture(e.pointerId);tapStart=null;
@@ -496,12 +495,9 @@ function resize(){
 let wheelGesture=null;
 function closeWheel(){activeWheel=null;wheelGesture=null;}
 function selectWheel(index){
- if(game.state.motion||game.state.location.startsWith('car'))return;
+ cancelWander();if(game.state.motion||game.state.location.startsWith('car'))return;
  const wheel=platformWheels[index];
- requestWalk(wheel.id,false,()=>{
-  afterWalk=()=>{activeWheel=index;say('Turn the yellow wheel itself. Tap the floor to step away.');};
-  startWander(wheel.approach);
- });
+ closeWheel();repairRequested=false;startWander(wheel.approach,wheel.id,()=>{activeWheel=index;say('Turn the yellow wheel itself. Tap the floor to step away.');});
 }
 function readyToDrive(){return game.state.pressed[0]&&!game.state.motion&&!game.state.complete;}
 function driveCab(up){

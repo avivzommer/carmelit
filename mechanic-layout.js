@@ -8,6 +8,7 @@ export function createMechanicLayout(chapter=1,builders={}){
  const root=new THREE.Group();root.name='Stations and clear pedestrian paths';
  const near=chapter===2?1:-1,far=-near,[LOW,MID,HIGH]=STATION_Y;
  const serviceY=MID-1.35,serviceZ=-3.2,bypassX=4.3,bypassZ=-5.6;
+ const stairX=builders.serviceStairX??2.7;
  const palette={cream:'#efe7d4',yellow:'#f2c43e',blue:'#315b9b'};
  const material=color=>new THREE.MeshStandardMaterial({color,roughness:.85});
  const mesh=builders.mesh||((geometry,mat,x,y,z,parent)=>{const m=new THREE.Mesh(geometry,mat);m.position.set(x,y,z);parent.add(m);return m;});
@@ -42,7 +43,7 @@ export function createMechanicLayout(chapter=1,builders={}){
    solid(x,y+.006,z+d/2-Math.min(.055,d/3),w,.012,Math.min(.10,d/3),basement?'#c8a44d':palette.yellow,g);
    if((id.startsWith('station')||id.startsWith('dock'))&&Math.abs(x)>1)solid(x-Math.sign(x)*(w/2-.06),y+.006,z,.12,.012,d,palette.yellow,g);
   }else for(let i=0;i<Math.floor(w/.36);i+=2)solid(x-w/2+.18+i*.36,y+.004,z,.34,.008,d,palette.yellow,g);
-  surfaces.push({x,y,z,w,d});return tag(g,id);
+  surfaces.push({x,y,z,w,d,id});return tag(g,id);
  }
  function shell(x,y,z,width){
   const g=new THREE.Group();g.name='Curved station tunnel';root.add(g);
@@ -106,19 +107,19 @@ export function createMechanicLayout(chapter=1,builders={}){
  // Maintenance stairs descend below the entire moving train and cable envelope.
  for(const side of [-1,1]){
   const id=side===far?'dockFar':'dockNear';
-  deck(side*2.83,MID,.1,1.5,.95,id);
+  const outer=Math.max(3.58,stairX+.65);deck(side*(2.08+outer)/2,MID,.1,outer-2.08,.95,id);
   // Full-depth treads keep the mechanic clear of the preceding riser while
   // descending. Derive both the mesh and waypoints from the same stair span.
-  const path=[[side*2.7,MID,0],[side*2.7,MID,-.3]],steps=12;
+  const path=[[side*2.7,MID,0]];if(stairX!==2.7)path.push([side*stairX,MID,0]);path.push([side*stairX,MID,-.3]);const steps=12;
   const stairStartZ=-.375,stairEndZ=serviceZ+.175,run=(stairStartZ-stairEndZ)/steps;
   for(let i=0;i<steps;i++){
    const y=MID-(MID-serviceY)*(i+1)/steps,z=stairStartZ-run*(i+.5);
-   deck(side*2.7,y,z,chapter===2?1.1:.7,run+.008,`stairs:${id}`);
-   path.push([side*2.7,y,z]);
+   deck(side*stairX,y,z,chapter===2?1.1:.7,run+.008,`stairs:${id}`);
+   path.push([side*stairX,y,z]);
   }
-  path.push([side*2.7,serviceY,serviceZ]);stairPaths.set(id,path);
+  path.push([side*stairX,serviceY,serviceZ]);stairPaths.set(id,path);
  }
- deck(0,serviceY,serviceZ,6.1,.7,'repair');
+ deck(0,serviceY,serviceZ,Math.max(6.1,stairX*2+.7),.7,'repair');
  // Provide standing room in front of the opened service cabinet.
  deck(0,serviceY,serviceZ-.35,1,.95,'repair');
  for(const [side,repairIndex] of [[near,2],[far,1]]){
@@ -133,7 +134,7 @@ export function createMechanicLayout(chapter=1,builders={}){
  }
  // Repeat the real lock at the visible stair mouth, so its state is clear before descent.
  if(chapter===2)for(const [side,repairIndex]of [[near,2],[far,1]]){
-  const x=side*2.7,z=-.30;
+  const x=side*stairX,z=-.30;
   const bars=new THREE.Group();bars.name='Visible stair entrance barrier';root.add(bars);
   for(const dx of [-.43,.43])decor(solid(x+dx,MID+.34,z,.065,.68,.065,palette.blue));
   for(const dx of [-.30,-.15,0,.15,.30])solid(x+dx,MID+.29,z,.035,.54,.045,palette.yellow,bars);

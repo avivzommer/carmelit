@@ -1,5 +1,5 @@
 // The two stations share one cable. The middle landing is a maintenance passage.
-export function createMechanicJourney(chapter=1){
+export function createMechanicJourney(chapter=1,{autoRepair=true}={}){
  const primary=chapter===2?'carB':'carA',secondary=primary==='carA'?'carB':'carA';
  const low=primary==='carA'?0:2,high=2-low;
  const initial=()=>({location:'entrance',stop:low,pressed:[false,false,false],motion:null,complete:false});
@@ -27,7 +27,7 @@ export function createMechanicJourney(chapter=1){
   const queue=[[state.location]],seen=new Set([state.location]);
   while(queue.length){const path=queue.shift(),here=path.at(-1);if(here===to){
     const repairNodes=['station1','station2Far','repair'];
-    const stopAt=path.findIndex((node,n)=>n>0&&repairNodes.includes(node)&&!state.pressed[repairNodes.indexOf(node)]);
+    const stopAt=autoRepair?path.findIndex((node,n)=>n>0&&repairNodes.includes(node)&&!state.pressed[repairNodes.indexOf(node)]):-1;
     const actualPath=stopAt>0?path.slice(0,stopAt+1):path,arrival=actualPath.at(-1);
     state.motion={type:'walk',path:actualPath,to:arrival,continueTo:arrival===to?null:to};return actualPath;
    }
@@ -36,7 +36,7 @@ export function createMechanicJourney(chapter=1){
  }
  function finishWalk(){if(state.motion?.type!=='walk')return false;const continueTo=state.motion.continueTo;state.location=state.motion.to;state.motion=null;
   const i=['station1','station2Far','repair'].indexOf(state.location);
-  if(i>=0&&!state.pressed[i])state.motion={type:'repair',index:i,continueTo};
+  if(autoRepair&&i>=0&&!state.pressed[i])state.motion={type:'repair',index:i,continueTo};
   checkDeparture();return true;
  }
  function finishRepair({reveal=false}={}){
