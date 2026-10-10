@@ -29,12 +29,18 @@
 <link rel="stylesheet" href="./mobile-prototype.css">
 </head>
 <body data-chapter="2">
-  <canvas id="scene" aria-label="Mobile station level. Use the large repair and boarding buttons. Overview shows the station. Restart repeats the journey."></canvas>
+  <canvas id="scene" aria-label="Mobile station level. Tap floors to explore, repair cabinets, turn platform wheels, and use cabin controls. Overview shows the station. Restart repeats the journey."></canvas>
   <div id="repair-progress" aria-label="Repair progress"><span aria-label="Repair 1: pending">▲</span><span aria-label="Repair 2: pending">■</span><span aria-label="Repair 3: pending">●</span></div>
   <div id="controls"><button id="overview" aria-pressed="false">Overview</button><button id="help">Hint</button> <button id="restart" title="Restart (R)">Restart</button></div>
   <p id="status" role="status" aria-live="polite"></p>
   <div id="win" hidden role="dialog" aria-modal="true" aria-labelledby="win-title"><h1 id="win-title">Level complete.</h1><p>Power restored. The line is running again.</p><button id="again">Play again</button><a class="level-link" style="margin-top:20px" href="./index.html">Return to station</a></div>
-  <button id="world-action" hidden aria-label="Walk to the repair cabinet">Repair cabinet</button>
+  <div id="machine-markers" aria-label="Station machinery"></div>
+<section id="wheel-dial" hidden aria-label="Cable haul wheel">
+ <button id="wheel-close" aria-label="Leave wheel">×</button>
+ <div id="wheel-position" role="status">Cable haul wheel</div>
+ <div id="dial-face" aria-label="Drag around the wheel to move the carts"><svg viewBox="0 0 120 120" aria-hidden="true"><g id="dial-rotor"><circle cx="60" cy="60" r="43"/><path d="M60 17V103M17 60H103"/><circle class="hub" cx="60" cy="60" r="9"/><circle class="grip" cx="101" cy="60" r="7"/></g></svg></div>
+ <div class="wheel-keys"><button id="wheel-back" aria-label="Turn wheel counterclockwise">↶</button><span>Turn to haul<br>Release at a stop</span><button id="wheel-forward" aria-label="Turn wheel clockwise">↷</button></div>
+</section>
 <script type="module" src="./mobile-prototype.js"></script>
 </body>
 </html>

@@ -1,3 +1,5 @@
+import {createPlatformWheel,createCabControls,wheelTravel,carriageStep} from './mobile-machinery.js';
+import {createFloorWalker} from './mobile-wander.js';
 import {createRunout,createDepartureRunout,applyDepartureFade} from './mechanic-runout.js';
 import * as THREE from 'three';
 import {createMechanicJourney} from './mechanic-state.mjs';
@@ -7,7 +9,7 @@ import {createWalkGuard,createPlayerCutaway,cabinetWorkOffset} from './mechanic-
 import {advanceWalkStep} from './mechanic-walk.js';
 import {createRestoration} from './mechanic-restoration.js';
 import {createTrack,trainPosition,STATION_Y,TERMINAL_Z,LINE_CLIP_PLANES,departureTravel,deckHeightAtZ} from './mechanic-track.js';
-import {createTrainPointer} from './mechanic-input.mjs';
+
 import {createRepairCabinet} from './mechanic-repair.js';
 import {createCarmelitTrain} from './mechanic-train.js';
 import {createUndergroundAtmosphere} from './mechanic-atmosphere.js';
@@ -170,13 +172,14 @@ const {floors}=layout;
 const atmosphere=createUndergroundAtmosphere({scene,renderer,ambient,sunlight,fill,passages:layout.passages,
  onChange:(strength,power)=>document.body.style.setProperty('--underground-depth',THREE.MathUtils.lerp(.30*(1-power),1,strength).toFixed(3))});
 const reducedMotion=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-const say=text=>status.textContent=text;
+let feedbackTimer;
+const say=text=>{status.textContent=text;if(/before|already at|blocked|obstacle|closed|other side|level with/i.test(text)){document.body.classList.add('show-hint');clearTimeout(feedbackTimer);feedbackTimer=setTimeout(()=>document.body.classList.remove('show-hint'),3500);}};
 const introCard=document.createElement('div');introCard.id='intro-guide';introCard.hidden=true;
 introCard.setAttribute('role','dialog');introCard.setAttribute('aria-modal','true');introCard.setAttribute('aria-labelledby','intro-title');
 const introPanel=document.createElement('section'),introCount=document.createElement('div'),introTitle=document.createElement('h1'),introText=document.createElement('p'),introNext=document.createElement('button');
 introCount.className='intro-progress';introCount.setAttribute('role','progressbar');introCount.setAttribute('aria-label','Introduction progress');introCount.setAttribute('aria-valuemin','0');introCount.setAttribute('aria-valuemax','3');
 introTitle.id='intro-title';introNext.type='button';introPanel.append(introCount,introTitle,introText,introNext);introCard.append(introPanel);document.body.append(introCard);
-const introPages=[['Bring the line back to life','Restore the three repair cabinets. Tap the markers to walk, board a train, or travel to the next stop. Follow the stairs underground to fix the cable drive, then return to your train and depart. Use Overview to see the whole station.']];
+const introPages=[['Bring the line back to life','Tap the floor to explore, and tap a blue cabinet to repair it. Platform wheels move the cable-linked carts: turn either way and watch which cart approaches. Release at a stop, board through an open door, then use the cabin’s uphill or downhill controls. Restore all three cabinets to open the exit.']];
 let introPage=0;
 let actionRevealTimer;
 function cancelActionReveal(){clearTimeout(actionRevealTimer);}
@@ -310,20 +313,24 @@ function updatePowerPulses(dt){
 }
 
 const restoration=createRestoration({near,floors,stairPaths:layout.stairPaths,terminalZ:chapter===2?TERMINAL_Z:null});scene.add(restoration.root);
-// A turning service wheel visibly starts when the middle repair is complete.
-const {serviceWheel}=layout;
+// Repairs use cabinets. Separate platform wheels haul the cable-linked carts.
+const {serviceWheel}=layout;serviceWheel.visible=false;
+const wheelSpecs=[['station1',1,4.40,4.10,3.95,4.10],['station2Far',0,-3.85,-2.65,-3.35,-2.65],['station2Near',1,3.85,-2.65,3.35,-2.65],['dockFar',0,-3.42,.40,-2.95,.35],['dockNear',1,3.42,.40,2.95,.35]];
+const platformWheels=wheelSpecs.map(([id,car,x,z,ax,az],i)=>{const y=floors[id][1],model=createPlatformWheel(new THREE.Vector3(x,y,z),i);scene.add(model.root);return {...model,id,car,approach:new THREE.Vector3(ax,y,az)};});
+const cabControls=trainModels.map(createCabControls);
 const repairTool=new THREE.Group();arms[1].elbow.add(repairTool);
 mesh(new THREE.BoxGeometry(.014,.07,.014),steel,0,-.11,.02,repairTool);
 mesh(new THREE.TorusGeometry(.022,.006,6,12,Math.PI*1.5),steel,0,-.157,.02,repairTool);
 repairTool.visible=false;
 const architecture=[layout.root,...(station?[station.root]:[])];
-const clearanceRoots=[...architecture,...carriages,...cabinets.map(c=>c.root),restoration.root,...tracks];
+const clearanceRoots=[...architecture,...carriages,...cabinets.map(c=>c.root),restoration.root,...tracks,...platformWheels.map(w=>w.root)];
 person.userData.alwaysVisible=true;
 const walkGuard=createWalkGuard(clearanceRoots),cutaway=createPlayerCutaway([scene],{passages:layout.passages});
-let travel=game.low,animation=null;
+let travel=game.low,animation=null,repairRequested=false,afterWalk=null,activeWheel=null;
+const floorWalker=createFloorWalker(layout.surfaces,walkGuard);
 function point(id){if(id==='carA'||id==='carB')return carriages[id==='carA'?0:1].position.clone();return vector(floors[id]);}
 function positions(t){travel=t;carriages.forEach((car,i)=>car.position.copy(trainPosition(i,t)));if(['carA','carB'].includes(game.state.location))person.position.copy(point(game.state.location));}
-function hint(){const action=mobileAction();say(action?`Next action: ${action.label}.`:game.state.complete?'Level complete.':'Please wait for the technician.');}
+function hint(){say(game.state.complete?'Level complete.':!game.state.pressed[0]?'Explore the platform and repair the blue power cabinet.':'Tap floors to explore. Turn a platform wheel to move the paired carts, or board and use the cabin controls.');}
 
 function route(a,b){return layout.route(a,b,point);}
 function blockedWalkHint(id){
@@ -338,42 +345,69 @@ function blockedWalkHint(id){
 function walk(id){
  if(['intro','reveal'].includes(game.state.motion?.type))return;
  if(id.startsWith('stairs:')){const dock=id.slice(7);id=game.state.location===dock?'repair':dock;}
- if(id===game.state.location){hint();return;}
+ if(id===game.state.location){if(repairRequested&&repairIds.includes(id)&&!game.state.pressed[repairIds.indexOf(id)]){game.state.motion={type:'repair',index:repairIds.indexOf(id)};animation={type:'walk',points:[]};nextStep();}else{const done=afterWalk;afterWalk=null;done?.();}return;}
  if(id==='upperPassage')id=game.state.location==='station2Far'?'station2Near':'station2Far';
  const path=game.walk(id);if(!path){if(!game.state.motion)blockedWalkHint(id);return;}
- const points=[];for(let i=1;i<path.length;i++)points.push(...route(path[i-1],path[i]));animation={type:'walk',points};nextStep();
+ const points=[];if(!game.state.location.startsWith('car')&&person.position.distanceTo(point(game.state.location))>.03){const lead=floorWalker.path(person.position,point(game.state.location));if(!lead){game.state.motion=null;say('Walk around this obstacle first.');return;}points.push(...lead);}for(let i=1;i<path.length;i++)points.push(...route(path[i-1],path[i]));animation={type:'walk',points};nextStep();
 }
 function nextStep(){
  if(!animation.points.length){
-  game.finishWalk();animation=null;
+  game.finishWalk();animation=null;if(game.state.motion?.type==='repair'&&!repairRequested)game.state.motion=null;
   if(game.state.motion?.type==='repair'){
    const index=game.state.motion.index,cabinet=cabinets[index],from=person.position.clone();
    const work=cabinet.root.position.clone().add(cabinetWorkOffset);
    animation={type:'repair',index,from,work,continueTo:game.state.motion.continueTo,time:0,duration:3.2};
    say(['Opening the power cabinet. Restoring station power…','Opening the release cabinet. Repairing the train controls…','Opening the service cabinet. Repairing the cable drive…'][index]);
-  }else if(game.state.motion?.type==='departure')depart();else hint();return;
+  }else if(game.state.motion?.type==='departure')depart();else {const done=afterWalk;afterWalk=null;if(done)done();else hint();}return;
  }
  const from=person.position.clone(),to=animation.points.shift(),d=to.clone().sub(from);Object.assign(animation,{from,to,time:0,duration:Math.max(.1,from.distanceTo(to)/1.55)});if(Math.hypot(d.x,d.z)>.001)desiredHeading=Math.atan2(d.x,d.z);
 }
 function depart(){animation={type:'departure',from:travel,to:departureTravel(game.high,chapter),time:0,duration:chapter===2?6:2.1};say(chapter===1?'Line repaired. Departing for the upper line.':'The exit is open. Taking the train through the final tunnel.');}
 function release(index){if(game.release(index))animation={type:'slide',from:travel,to:index,time:0,duration:Math.max(.45,Math.abs(travel-index)*.7)};}
-function reset(){cancelActionReveal();introCard.hidden=true;document.querySelector('#controls').inert=false;canvas.style.opacity='1';introFocus=0;departureFocus=0;resize();pointer.cancel();game.reset();animation=null;positions(game.low);person.position.copy(point('entrance'));person.rotation.y=0;desiredHeading=0;settlePose();bodyRig.rotation.x=0;repairTool.visible=false;cabinets.forEach(c=>c.setProgress(0,false));win.hidden=true;document.body.classList.remove('departing','entering');restoration.reset();station?.reset();atmosphere?.reset();layout.updateGates(game.state.pressed);updateBoarding();hint();}
+function reset(){cancelActionReveal();introCard.hidden=true;document.querySelector('#controls').inert=false;canvas.style.opacity='1';introFocus=0;departureFocus=0;resize();closeWheel();repairRequested=false;afterWalk=null;game.reset();animation=null;positions(game.low);person.position.copy(point('entrance'));person.rotation.y=0;desiredHeading=0;settlePose();bodyRig.rotation.x=0;repairTool.visible=false;cabinets.forEach(c=>c.setProgress(0,false));win.hidden=true;document.body.classList.remove('departing','entering');restoration.reset();station?.reset();atmosphere?.reset();layout.updateGates(game.state.pressed);updateBoarding();hint();}
 const raycaster=new THREE.Raycaster(),ndc=new THREE.Vector2();
-function hit(e){const r=canvas.getBoundingClientRect();ndc.set((e.clientX-r.left)/r.width*2-1,1-(e.clientY-r.top)/r.height*2);raycaster.setFromCamera(ndc,camera);scene.updateMatrixWorld(true);for(const h of raycaster.intersectObjects(scene.children,true)){let parent=h.object,ignore=false;while(parent){if(parent===person||!parent.visible){ignore=true;break;}parent=parent.parent;}if(ignore||h.object.userData.cutawayOpacity<.35)continue;const d=h.object.userData;if(d.trainIndex!==undefined)return {trainIndex:d.trainIndex,destination:d.destination};if(d.destination)return {destination:d.destination};break;}return null;}
-canvas.style.touchAction='none';
-const pointer=createTrainPointer({
- available:()=>!game.state.motion&&!game.state.complete&&!animation,
- pick:hit,travel:()=>travel,begin:()=>game.beginDrag(),move:positions,end:release,click:walk,
- blocked:()=>say('Step on the triangle and let the mechanic finish the power repair before moving the trains.'),
- cancel:()=>{game.cancel();positions(game.state.stop);},
- capture:id=>canvas.setPointerCapture(id),releaseCapture:id=>{if(canvas.hasPointerCapture(id))canvas.releasePointerCapture(id);},
- axis:()=>{const a=trainPosition(0,0).project(camera),b=trainPosition(0,1).project(camera);return {x:(b.x-a.x)*canvas.clientWidth/2,y:-(b.y-a.y)*canvas.clientHeight/2};}
-});
-// This prototype uses generous destination buttons rather than precision dragging.
-// Keep the original pointer implementation isolated from this experiment.
-canvas.addEventListener('pointermove',e=>{if(pointer.move(e)){canvas.style.cursor=pointer.dragging?'grabbing':'grab';return;}const h=hit(e);canvas.style.cursor=h?.trainIndex!==undefined?'grab':h?'pointer':'default';});
-
-canvas.addEventListener('pointercancel',pointer.cancel);canvas.addEventListener('lostpointercapture',pointer.cancel);
+function pointerRay(e){const r=canvas.getBoundingClientRect();ndc.set((e.clientX-r.left)/r.width*2-1,1-(e.clientY-r.top)/r.height*2);raycaster.setFromCamera(ndc,camera);scene.updateMatrixWorld(true);}
+function interactiveHit(e){
+ pointerRay(e);
+ for(const h of raycaster.intersectObjects(scene.children,true)){
+  if(h.object.userData.cutawayOpacity<.35)continue;
+  let hidden=false;for(let p=h.object;p;p=p.parent)if(p===person||!p.visible)hidden=true;if(hidden)continue;
+  const d=h.object.userData;
+  if(d.platformWheel!==undefined)return {wheel:d.platformWheel};
+  if(d.cabDirection!==undefined)return {up:d.cabDirection};
+  if(d.trainIndex!==undefined)return {destination:d.destination};
+  if(d.destination&&cabinets.some(c=>{let p=h.object;while(p){if(p===c.root)return true;p=p.parent;}return false;}))return {repair:d.destination};
+  // A visible floor resolves to a real deck, rather than a tagged wall or rail.
+  if(h.face?.normal.y>.8&&d.destination)return {floor:h.point,zone:d.destination};
+  if(d.destination?.startsWith('stairs:'))return {destination:d.destination};
+  break;
+ }
+ return null;
+}
+function requestWalk(id,repair=false,done=null){if(game.state.motion||game.state.complete)return;closeWheel();repairRequested=repair;afterWalk=done;if(repair&&id===game.state.location&&person.position.distanceTo(point(id))>.04){afterWalk=()=>requestWalk(id,true,done);startWander(point(id));}else walk(id);}
+function startWander(to){
+ const points=floorWalker.path(person.position,to);if(!points){say('That spot is blocked or outside the walking path.');return;}
+ game.state.motion={type:'wander'};animation={type:'wander',points};nextWander();
+}
+function nextWander(){
+ if(!animation.points.length){animation=null;game.state.motion=null;const done=afterWalk;afterWalk=null;done?.();return;}
+ const to=animation.points.shift(),from=person.position.clone(),d=to.clone().sub(from);
+ Object.assign(animation,{from,to,time:0,duration:Math.max(.08,from.distanceTo(to)/1.55)});desiredHeading=Math.atan2(d.x,d.z);
+}
+function exploreFloor(to,zone){
+ if(game.state.motion||game.state.location.startsWith('car'))return;
+ closeWheel();repairRequested=false;
+ to.y=layout.surfaces.reduce((best,s)=>Math.abs(s.y-to.y)<Math.abs(best-to.y)?s.y:best,layout.surfaces[0].y);
+ const local=floorWalker.path(person.position,to);
+ if(local){game.state.motion={type:'wander'};animation={type:'wander',points:local};nextWander();return;}
+ if(zone==='upperPassage')zone=to.x<0?'station2Far':'station2Near';
+ if(zone.startsWith('stairs:')){requestWalk(zone);return;}
+ if(floors[zone])requestWalk(zone,false,()=>startWander(to));
+}
+let tapStart=null;
+canvas.addEventListener('pointerdown',e=>{if(!game.state.motion&&!overview){tapStart={x:e.clientX,y:e.clientY,id:e.pointerId};}});
+canvas.addEventListener('pointerup',e=>{if(!tapStart||tapStart.id!==e.pointerId)return;const start=tapStart;tapStart=null;if(Math.hypot(e.clientX-start.x,e.clientY-start.y)>12)return;const h=interactiveHit(e);if(h?.wheel!==undefined)selectWheel(h.wheel);else if(h?.up!==undefined)driveCab(h.up);else if(h?.repair)requestWalk(h.repair,true);else if(h?.floor)exploreFloor(h.floor.clone(),h.zone);else if(h?.destination)requestWalk(h.destination);});
+canvas.addEventListener('pointercancel',()=>tapStart=null);
 window.addEventListener('keydown',e=>{if(e.key.toLowerCase()==='r'&&!(e.target instanceof HTMLButtonElement)){overview=false;reset();startEntrance();}});
 document.querySelector('#restart').onclick=()=>{overview=false;reset();startEntrance();};document.querySelector('#again').onclick=()=>{overview=false;reset();startEntrance();};let hintTimer;document.querySelector('#help').onclick=()=>{hint();document.body.classList.toggle('show-hint');clearTimeout(hintTimer);hintTimer=setTimeout(()=>document.body.classList.remove('show-hint'),6000);};
 // Fit both trains at both ends of their travel, including the departure, before adding scenery.
@@ -398,65 +432,94 @@ function resize(){
  }
  camera.updateProjectionMatrix();
 }
-const worldAction=document.querySelector('#world-action');
-// Contextual destinations use the existing navigation graph and clearance guard.
-// Train travel always goes to an aligned stop, never to an arbitrary drag position.
-function mobileAction(){
- const {location,stop,pressed}=game.state;
- if(game.state.motion||game.state.complete)return null;
- if(!pressed[0])return {label:'Repair cabinet',destination:'station1',anchor:cabinets[0].root.position};
- if(!pressed[1]){
-  if(location===game.primary)return {label:stop===game.low?'Travel uphill':'Step off train',stop:stop===game.low?game.high:undefined,destination:stop===game.low?undefined:'station2Near'};
-  if(stop===game.high)return {label:'Repair upper cabinet',destination:'station2Far'};
-  return {label:'Board train',destination:game.primary};
- }
- if(!pressed[2]){
-  if(location===game.secondary)return stop===game.low?{label:'Travel to maintenance',stop:1}:{label:'Go downstairs',destination:'repair'};
-  if(location==='dockFar'||location==='repair')return {label:'Repair cable drive',destination:'repair',anchor:cabinets[2].root.position};
-  return stop!==game.low?{label:'Call maintenance train',stop:game.low}:{label:'Board other train',destination:game.secondary};
- }
- if(location===game.primary)return {label:'Depart station',stop:game.high};
- return {label:'Return to train',destination:game.primary};
+const markerLayer=document.querySelector('#machine-markers'),markerButtons=new Map();
+const dial=document.querySelector('#wheel-dial'),rotorUI=document.querySelector('#dial-rotor');
+let wheelGesture=null;
+function closeWheel(){activeWheel=null;dial.hidden=true;wheelGesture=null;}
+function selectWheel(index){
+ if(game.state.motion||game.state.location.startsWith('car'))return;
+ const wheel=platformWheels[index];
+ requestWalk(wheel.id,false,()=>{
+  afterWalk=()=>{activeWheel=index;dial.hidden=false;say('Turn clockwise to haul this side uphill. Turn back to bring it downhill.');};
+  startWander(wheel.approach);
+ });
 }
-function performMobileAction(){
- if(overview)return;
- const action=mobileAction();if(!action)return;
- if(action.stop!==undefined){if(game.beginDrag())release(action.stop);}
- else walk(action.destination);
+function readyToDrive(){return game.state.pressed[0]&&!game.state.motion&&!game.state.complete;}
+function driveCab(up){
+ if(!game.state.location.startsWith('car')||!readyToDrive()){say('Repair the power cabinet before operating the trains.');return;}
+ const index=game.state.location==='carB'?1:0,to=carriageStep(game.state.stop,index,up);
+ if(to===game.state.stop){say('This cart is already at the end of the line.');return;}
+ if(game.beginDrag())animation={type:'closeDoors',time:0,duration:.35,to};
 }
-worldAction.onclick=performMobileAction;
-document.querySelector('#overview').onclick=()=>{
- overview=!overview;document.querySelector('#overview').setAttribute('aria-pressed',String(overview));
- document.querySelector('#overview').textContent=overview?'Back to player':'Overview';resize();
-};
+function beginWheel(){
+ if(activeWheel===null||!readyToDrive()){say('Repair the blue power cabinet before turning the haul wheel.');return false;}
+ if(!game.beginDrag())return false;
+ animation={type:'wheelDrive',time:0,duration:Infinity,target:travel,released:false};return true;
+}
+function wheelAngle(e){const r=dialFace.getBoundingClientRect();return Math.atan2(e.clientY-r.top-r.height/2,e.clientX-r.left-r.width/2);}
+const dialFace=document.querySelector('#dial-face');
+dialFace.addEventListener('pointerdown',e=>{if(e.button!==0||!beginWheel())return;e.preventDefault();wheelGesture={id:e.pointerId,last:wheelAngle(e),total:0,start:travel};dialFace.setPointerCapture(e.pointerId);});
+dialFace.addEventListener('pointermove',e=>{
+ if(!wheelGesture||e.pointerId!==wheelGesture.id)return;
+ const angle=wheelAngle(e),delta=Math.atan2(Math.sin(angle-wheelGesture.last),Math.cos(angle-wheelGesture.last));wheelGesture.total+=delta;wheelGesture.last=angle;
+ animation.target=wheelTravel(wheelGesture.start,wheelGesture.total,platformWheels[activeWheel].car);
+ rotorUI.style.transform=`rotate(${wheelGesture.start*Math.PI*(platformWheels[activeWheel].car?-1:1)+wheelGesture.total}rad)`;
+});
+function finishWheel(){if(animation?.type==='wheelDrive')animation.released=true;wheelGesture=null;}
+dialFace.addEventListener('pointerup',finishWheel);dialFace.addEventListener('pointercancel',finishWheel);dialFace.addEventListener('lostpointercapture',finishWheel);
+for(const [id,angle]of [['wheel-back',-Math.PI],['wheel-forward',Math.PI]])document.querySelector('#'+id).onclick=()=>{if(beginWheel()){animation.target=wheelTravel(travel,angle,platformWheels[activeWheel].car);animation.released=true;}};
+document.querySelector('#wheel-close').onclick=()=>{if(!game.state.motion)closeWheel();};
+document.querySelector('#overview').onclick=()=>{if(game.state.motion?.type==='wheelDrive')return;overview=!overview;closeWheel();document.querySelector('#overview').setAttribute('aria-pressed',String(overview));document.querySelector('#overview').textContent=overview?'Back to player':'Overview';resize();};
+let occupiedMarkers=[];
+function marker(key,label,world,action){
+ let button=markerButtons.get(key);
+ if(!button){button=document.createElement('button');button.type='button';button.dataset.marker=key;markerLayer.append(button);markerButtons.set(key,button);}
+ const p=world.clone().project(camera),x=(p.x+1)*canvas.clientWidth/2,y=(1-p.y)*canvas.clientHeight/2;
+ if(x<28||x>canvas.clientWidth-28||y<100||y>canvas.clientHeight-30)return;
+ button.hidden=false;button.textContent=label;
+ const width=button.offsetWidth,height=button.offsetHeight,cx=THREE.MathUtils.clamp(x,width/2+10,canvas.clientWidth-width/2-10);
+ let cy=y,placed=false;
+ for(const offset of [0,-54,54,-108,108]){
+  const candidate=y+offset,rect={left:cx-width/2,right:cx+width/2,top:candidate-height,bottom:candidate};
+  if(rect.top<90||rect.bottom>canvas.clientHeight-20)continue;
+  if(occupiedMarkers.every(r=>rect.right+8<r.left||rect.left-8>r.right||rect.bottom+8<r.top||rect.top-8>r.bottom)){cy=candidate;occupiedMarkers.push(rect);placed=true;break;}
+ }
+ if(!placed){button.hidden=true;return;}
+ button.style.left=`${cx}px`;button.style.top=`${cy}px`;button.onclick=action;
+}
 function updateMobileJourney(dt){
  const motion=game.state.motion?.type,busy=Boolean(motion),aboard=['carA','carB'].includes(game.state.location);
  const focusWorld=person.position.clone().add(new THREE.Vector3(0,.65,0));
- // Briefly reveal the gate after the final underground repair, then return below.
  const reveal=motion==='reveal'?restorationReveal(animation.time,reducedMotion).surfaceReveal:0;
  if(reveal)focusWorld.lerp(new THREE.Vector3(0,deckHeightAtZ(TERMINAL_Z)+1.7,TERMINAL_Z),reveal);
  const focus=focusWorld.applyMatrix4(camera.matrixWorldInverse);
- if(mobileCenter){const k=reducedMotion?1:1-Math.exp(-4*dt);mobileCenter.lerp(new THREE.Vector2(focus.x,focus.y),k);}
- mobileWidth=THREE.MathUtils.damp(mobileWidth,reveal?8:motion==='intro'?7.2:aboard?6.4:5.4,4,dt);resize();
- const action=mobileAction();worldAction.hidden=busy||game.state.complete||overview||!action;
- document.querySelectorAll('#repair-progress span').forEach((dot,i)=>{
-  dot.classList.toggle('on',game.state.pressed[i]);dot.setAttribute('aria-label',`Repair ${i+1}: ${game.state.pressed[i]?'complete':'pending'}`);
- });
- if(!worldAction.hidden){
-  let anchor;
-  if(action.anchor)anchor=action.anchor.clone().add(new THREE.Vector3(0,.8,0));
-  else if(aboard)anchor=person.position.clone().add(new THREE.Vector3(0,1.1,0));
-  else if(action.stop!==undefined)anchor=person.position.clone().add(new THREE.Vector3(0,1.3,0));
-  else {
-   // Point at the start of the safe route, so a distant destination stays legible.
-   const routePoints=route(game.state.location,action.destination);
-   anchor=(routePoints[0]||point(action.destination)).clone().add(new THREE.Vector3(0,.9,0));
-  }
-  anchor.project(camera);
-  const x=THREE.MathUtils.clamp((anchor.x+1)*canvas.clientWidth/2,90,canvas.clientWidth-90);
-  const y=THREE.MathUtils.clamp((1-anchor.y)*canvas.clientHeight/2-30,150,canvas.clientHeight-70);
-  worldAction.style.left=`${x}px`;worldAction.style.top=`${y}px`;
-  worldAction.textContent=action.label;worldAction.setAttribute('aria-label',action.label);
+ if(mobileCenter)mobileCenter.lerp(new THREE.Vector2(focus.x,focus.y),reducedMotion?1:1-Math.exp(-4*dt));
+ mobileWidth=THREE.MathUtils.damp(mobileWidth,reveal?8:motion==='intro'?7.2:aboard?5.8:5.4,4,dt);resize();
+ platformWheels.forEach(w=>w.rotor.rotation.z=-travel*Math.PI*(w.car?-1:1));
+ occupiedMarkers=[];markerButtons.forEach(b=>b.hidden=true);
+ document.querySelectorAll('#repair-progress span').forEach((dot,i)=>{dot.classList.toggle('on',game.state.pressed[i]);dot.setAttribute('aria-label',`Repair ${i+1}: ${game.state.pressed[i]?'complete':'pending'}`);});
+ if(activeWheel!==null){
+  const w=platformWheels[activeWheel],p=w.root.position.clone().add(new THREE.Vector3(0,.85,0)).project(camera);
+  dial.style.left=`${THREE.MathUtils.clamp((p.x+1)*canvas.clientWidth/2,90,canvas.clientWidth-90)}px`;
+  dial.style.top=`${THREE.MathUtils.clamp((1-p.y)*canvas.clientHeight/2,180,canvas.clientHeight-150)}px`;
+  for(const id of ['wheel-close','wheel-back','wheel-forward'])document.querySelector('#'+id).disabled=busy;
+  document.querySelector('#wheel-position').textContent=`Cart ${w.car+1} · ${['lower','middle','upper'][Math.round(w.car?2-travel:travel)]} stop`;
+  if(!wheelGesture)rotorUI.style.transform=`rotate(${travel*Math.PI*(w.car?-1:1)}rad)`;
+ }
+ if(busy||overview||activeWheel!==null||game.state.complete)return;
+ if(aboard){
+  const i=game.state.location==='carB'?1:0,base=carriages[i].position.clone();
+  marker('cab-up','▲ Uphill',base.clone().add(new THREE.Vector3(-.4,1.1,-.9)),()=>driveCab(true));
+  marker('cab-down','▼ Downhill',base.clone().add(new THREE.Vector3(.4,1.1,.9)),()=>driveCab(false));
+  const landing=game.landingFor(game.state.location);
+  if(landing)marker('exit','Step off',base.clone().add(new THREE.Vector3(Math.sign(floors[landing][0])*.95,.25,0)),()=>requestWalk(landing));
+ }else{
+  cabinets.forEach((c,i)=>{if((i===0?['entrance','station1'].includes(game.state.location):i===1?game.state.location.startsWith('station2'):game.state.location==='repair')&&person.position.distanceTo(c.root.position)<4&&!game.state.pressed[i])marker('repair'+i,'Repair '+['▲','■','●'][i],c.root.position.clone().add(new THREE.Vector3(0,1.15,0)),()=>requestWalk(repairIds[i],true));});
+  platformWheels.forEach((w,i)=>{if(w.id===(game.state.location==='entrance'?'station1':game.state.location)&&person.position.distanceTo(w.approach)<3)marker('wheel'+i,'Turn wheel',w.root.position.clone().add(new THREE.Vector3(0,1.15,0)),()=>selectWheel(i));});
+  for(const id of ['carA','carB']){const landing=game.landingFor(id);if(landing&&person.position.distanceTo(point(landing))<2.8)marker('board'+id,'Board',point(id).add(new THREE.Vector3(Math.sign(floors[landing][0])*.9,.35,0)),()=>requestWalk(id));}
+  if(game.state.location.startsWith('station2')){const other=game.state.location==='station2Far'?'station2Near':'station2Far',side=Math.sign(floors[game.state.location][0]);marker('passage','Passage',new THREE.Vector3(side*4.3,floors[game.state.location][1]+.3,-3.3),()=>requestWalk(other));}
+  if(game.state.location.startsWith('dock'))marker('stairs','Downstairs',point(game.state.location).add(new THREE.Vector3(0,.4,-.3)),()=>requestWalk('repair'));
+  if(game.state.location==='repair')for(const id of ['dockNear','dockFar'])if(game.state.pressed[id==='dockNear'?2:1])marker(id,id==='dockNear'?'Up to cart 2':'Up to cart 1',new THREE.Vector3(floors[id][0],floors.repair[1]+.4,-3.2),()=>requestWalk(id));
  }
 }
 
@@ -474,10 +537,10 @@ function startEntrance(){
 const clock=new THREE.Clock();
 function animate(){
  requestAnimationFrame(animate);const dt=Math.min(clock.getDelta(),.05),before=person.position.clone();
- if(!introCard.hidden||game.state.complete)return;
+ if(!introCard.hidden||game.state.complete){markerButtons.forEach(b=>b.hidden=true);dial.hidden=true;return;}
  let repairFrame=null,walked=false,surfaceReveal=0;
  if(animation){
-  if(animation.type!=='walk'&&(animation.type!=='departure'||restoration.opened))animation.time+=dt;
+  if(!['walk','wander'].includes(animation.type)&&(animation.type!=='departure'||restoration.opened))animation.time+=dt;
   const t=Math.min(1,animation.time/animation.duration),kind=animation.type;
   if(kind==='intro'){
    const frame=entranceFrame(animation.time,reducedMotion);
@@ -489,6 +552,11 @@ function animate(){
    person.position.copy(point('entrance'));person.position.z+=(1-frame.step)*.25;
    walked=frame.step>0&&frame.step<1;desiredHeading=Math.PI;
    if(frame.complete){positions(game.low);person.position.copy(point('entrance'));game.state.motion=null;animation=null;introFocus=0;canvas.style.opacity='1';document.body.classList.remove('entering');introCard.hidden=true;resize();hint();}
+  }else if(kind==='wander'){const frame=advanceWalkStep(animation,person.position,dt,walkGuard);walked=frame.moved;if(frame.arrived)nextWander();}
+  else if(kind==='closeDoors'){if(t===1)release(animation.to);}
+  else if(kind==='wheelDrive'){
+   if(animation.time>.35){positions(travel+Math.sign(animation.target-travel)*Math.min(Math.abs(animation.target-travel),dt*.9));
+    if(animation.released&&Math.abs(travel-animation.target)<.01)release(Math.round(animation.target));}
   }else if(kind==='walk'){
    const frame=advanceWalkStep(animation,person.position,dt,walkGuard);
    walked=frame.moved;if(frame.arrived)nextStep();
@@ -534,7 +602,7 @@ function animate(){
  station?.update(game.state.pressed,dt,undergroundStrength);
  restoration.update(game.state.pressed,dt,Math.abs(travel-1)<.015&&!['drag','slide'].includes(game.state.motion?.type),chapter!==2||powerPulses[2].time>=2.2);
  updateBoarding(dt);
- if(game.state.pressed[2])serviceWheel.rotation.z-=dt*.7;
+
  scene.updateMatrixWorld(true);cutaway.update(camera,person.position,dt,{surfaceReveal});
  updateMobileJourney(dt);
  renderer.render(scene,camera);
