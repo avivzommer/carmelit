@@ -175,7 +175,8 @@ const introCard=document.createElement('div');introCard.id='intro-guide';introCa
 introCard.setAttribute('role','dialog');introCard.setAttribute('aria-modal','true');introCard.setAttribute('aria-labelledby','intro-title');
 const introPanel=document.createElement('section'),introCount=document.createElement('div'),introTitle=document.createElement('h1'),introText=document.createElement('p'),introNext=document.createElement('button');
 introCount.className='intro-progress';introCount.setAttribute('role','progressbar');introCount.setAttribute('aria-label','Introduction progress');introCount.setAttribute('aria-valuemin','0');introCount.setAttribute('aria-valuemax','3');
-introTitle.id='intro-title';introNext.type='button';introPanel.append(introCount,introTitle,introText,introNext);introCard.append(introPanel);document.body.append(introCard);
+const introBrand=document.createElement('span');introBrand.className='dialog-brand';introBrand.textContent='Carmelit / Technician shift';
+introTitle.id='intro-title';introNext.type='button';introPanel.append(introBrand,introCount,introTitle,introText,introNext);introCard.append(introPanel);document.body.append(introCard);
 const introPages=[
  ['Your shift begins','The station has lost power. You are the technician sent to restore its three repair stations and bring the line back to life.'],
  ['Make your first repair','Tap the triangle beside the blue cabinet. The technician will walk over and fix it. Tap accessible paths and platforms to move around.'],

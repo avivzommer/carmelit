@@ -185,7 +185,8 @@ const introCard=document.createElement('div');introCard.id='intro-guide';introCa
 introCard.setAttribute('role','dialog');introCard.setAttribute('aria-modal','true');introCard.setAttribute('aria-labelledby','intro-title');
 const introPanel=document.createElement('section'),introCount=document.createElement('div'),introTitle=document.createElement('h1'),introText=document.createElement('p'),introNext=document.createElement('button');
 introCount.className='intro-progress';introCount.setAttribute('role','progressbar');introCount.setAttribute('aria-label','Introduction progress');introCount.setAttribute('aria-valuemin','0');introCount.setAttribute('aria-valuemax','3');
-introTitle.id='intro-title';introNext.type='button';introPanel.append(introCount,introTitle,introText,introNext);introCard.append(introPanel);document.body.append(introCard);
+const introBrand=document.createElement('span');introBrand.className='dialog-brand';introBrand.textContent='Carmelit / Technician shift';
+introTitle.id='intro-title';introNext.type='button';introPanel.append(introBrand,introCount,introTitle,introText,introNext);introCard.append(introPanel);document.body.append(introCard);
 const introPages=[['Bring the line back to life','Tap a floor or stair to choose where to walk. Tap again to change direction or turn back. Repairs happen only when you tap a blue cabinet with a wrench. You can board an open cart before fixing the power, but it will not move yet. Use the yellow wheel on the upper left platform to call the second cart. Inside a cart, swipe up or down to ride, or tap its arrow controls. Restore all three cabinets to open the exit.']];
 let introPage=0;
 let actionRevealTimer;

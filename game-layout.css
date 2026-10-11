@@ -21,27 +21,61 @@ body[data-chapter] #controls { width: max-content; max-width: calc(100% - 24px);
 body[data-chapter] #status { width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 body[data-chapter].show-hint #status { width: auto; height: auto; clip-path: none; top: max(76px, calc(env(safe-area-inset-top) + 66px)); bottom: auto; left: auto; right: 16px; max-width: min(320px, calc(100% - 32px)); padding: 12px 16px; border-radius: 14px; background: #172d3aeb; text-align: left; }
 
-#intro-guide { position: fixed; inset: 0; z-index: 5; display: grid; place-items: center; padding: 24px; box-sizing: border-box; overflow: auto; background: #081923bd; backdrop-filter: blur(7px); color: #fff4d6; text-align: center; font-family: system-ui; animation: intro-fade .5s ease both; }
-#intro-guide[hidden] { display: none; }
-#intro-guide section { width: min(520px, 100%); margin: auto; }
-#intro-guide .intro-progress { width: 120px; height: 4px; margin: 0 auto 28px; border-radius: 999px; background: #fff2; overflow: hidden; }
-#intro-guide .intro-progress::before { content: ""; display: block; height: 100%; width: var(--progress, 0%); background: #f2d890; border-radius: inherit; transition: width .4s ease; }
-@media (prefers-reduced-motion: reduce) { #intro-guide .intro-progress::before { transition: none; } }
-#intro-guide h1 { font-size: clamp(28px, 6vw, 46px); line-height: 1.15; font-weight: 500; margin: 22px 0; }
-#intro-guide p { font-size: clamp(16px, 3vw, 19px); line-height: 1.7; color: #e0e7e7; margin: 0 auto 32px; max-width: 460px; }
-#intro-guide button { border: 1px solid #f2d890; border-radius: 999px; padding: 14px 32px; min-height: 48px; color: #172d3a; background: #f2d890; font: 600 16px system-ui; cursor: pointer; }
-#intro-guide button:hover { background: #ffe6a4; }
-#intro-guide button:focus-visible { outline: 3px solid white; outline-offset: 5px; }
-@keyframes intro-fade { from { opacity: 0; } to { opacity: 1; } }
-@media (prefers-reduced-motion: reduce) { #intro-guide { animation: none; } }
-
-body[data-chapter] #win { background: #08192388; backdrop-filter: blur(2px); animation: intro-fade .8s ease both; padding: 24px; }
-body[data-chapter] #win h1 { font: 500 clamp(32px, 7vw, 52px)/1.15 system-ui; margin: 0 0 18px; }
-body[data-chapter] #win p { font: 18px/1.6 system-ui; max-width: 440px; }
-body[data-chapter] #win button { background: #f2d890; color: #172d3a; font-size: 16px; min-height: 48px; }
-@media (prefers-reduced-motion: reduce) { body[data-chapter] #win { animation: none; } }
-
+/* Carmelit cartridge UI. Silkscreen is bundled locally under the OFL. */
+@font-face { font-family: Carmelit Pixel; src: url('./vendor/silkscreen-regular.ttf') format('truetype'); font-weight: 400; font-display: swap; }
+:root { --station-blue: #084d88; --station-ink: #07375e; --station-red: #ed351c; --station-yellow: #f3bf31; --station-cream: #f4ecd9; }
+#intro-guide, body[data-chapter] #win {
+ position: fixed; inset: 0; z-index: 5; display: grid; place-items: center; place-content: normal;
+ padding: max(22px, env(safe-area-inset-top)) max(22px, env(safe-area-inset-right)) max(30px, env(safe-area-inset-bottom)) max(22px, env(safe-area-inset-left));
+ box-sizing: border-box; overflow: auto; background: #071e32b8; backdrop-filter: blur(5px);
+ color: var(--station-ink); text-align: center; font-family: system-ui, sans-serif; animation: intro-fade .5s ease both;
+}
+#intro-guide[hidden], body[data-chapter] #win[hidden] { display: none; }
+#intro-guide section, #win .station-dialog {
+ position: relative; isolation: isolate; box-sizing: border-box; width: min(600px, 100%); margin: auto;
+ padding: 32px clamp(20px, 5vw, 44px) 30px; border: 5px solid var(--station-blue); border-radius: 2px;
+ background: var(--station-cream); box-shadow: inset 0 0 0 3px #fff9e7, 0 0 0 2px var(--station-cream), 0 0 0 6px var(--station-blue), 0 10px 0 6px var(--station-ink), 0 24px 50px #00162466;
+}
+/* The familiar three-colour line belongs to the panel, not the playing field. */
+#intro-guide section::before, #win .station-dialog::before {
+ content: ''; position: absolute; inset: 0 0 auto; height: 10px; pointer-events: none;
+ background: linear-gradient(to right, var(--station-red) 0 60%, var(--station-yellow) 60% 80%, var(--station-blue) 80%);
+}
+.dialog-brand { display: block; margin: 0 0 18px; color: var(--station-blue); font: 400 11px/1.5 Carmelit Pixel, monospace; letter-spacing: .08em; }
+#intro-guide .intro-progress { width: 120px; height: 9px; margin: 0 auto 22px; padding: 2px; border: 2px solid var(--station-blue); border-radius: 0; background: #dddbc8; box-sizing: content-box; overflow: hidden; }
+#intro-guide .intro-progress::before { content: ''; display: block; height: 100%; width: var(--progress, 0%); background: var(--station-yellow); border-radius: 0; transition: width .4s ease; }
+#intro-guide h1, body[data-chapter] #win h1 { color: var(--station-blue); font: 400 clamp(24px, 4.5vw, 36px)/1.2 Carmelit Pixel, monospace; text-transform: uppercase; text-wrap: balance; margin: 0 0 22px; }
+#intro-guide p, body[data-chapter] #win p { color: var(--station-ink); opacity: 1; font: 400 17px/1.65 system-ui, sans-serif; margin: 0 auto 28px; max-width: 460px; text-wrap: pretty; }
+#intro-guide button, body[data-chapter] #win button, body[data-chapter] #win .level-link {
+ --button-fill: var(--station-red); --button-text: var(--station-cream); --button-trim: var(--station-yellow);
+ position: relative; display: flex; align-items: center; justify-content: center; gap: 14px; box-sizing: border-box;
+ width: 100%; min-height: 68px; margin: 0; padding: 14px 18px; border: 5px solid var(--station-blue); border-bottom-width: 9px; border-radius: 0;
+ background: var(--button-fill); color: var(--button-text); box-shadow: inset 0 0 0 2px var(--button-trim), inset 0 4px 0 #ffffff35, inset 0 -4px 0 #00000018;
+ font: 400 clamp(18px, 3vw, 22px)/1.35 Carmelit Pixel, monospace; text-transform: uppercase; text-decoration: none; text-shadow: none;
+ cursor: pointer; touch-action: manipulation; backdrop-filter: none; transition: background-color .15s, box-shadow .15s;
+ clip-path: polygon(0 10px,5px 10px,5px 5px,10px 5px,10px 0,calc(100% - 10px) 0,calc(100% - 10px) 5px,calc(100% - 5px) 5px,calc(100% - 5px) 10px,100% 10px,100% calc(100% - 10px),calc(100% - 5px) calc(100% - 10px),calc(100% - 5px) calc(100% - 5px),calc(100% - 10px) calc(100% - 5px),calc(100% - 10px) 100%,10px 100%,10px calc(100% - 5px),5px calc(100% - 5px),5px calc(100% - 10px),0 calc(100% - 10px));
+}
+#intro-guide button::before, body[data-chapter] #win button::before { content: ''; flex: 0 0 18px; width: 18px; height: 22px; background: currentColor; clip-path: polygon(0 0,6px 0,6px 4px,12px 4px,12px 8px,18px 8px,18px 14px,12px 14px,12px 18px,6px 18px,6px 22px,0 22px); }
+body[data-chapter] #win .level-link { --button-fill: var(--station-cream); --button-text: var(--station-blue); --button-trim: #fff9e7; margin-top: 12px; min-height: 60px; font-size: clamp(13px, 2.5vw, 17px); }
+#intro-guide button:hover, body[data-chapter] #win button:hover { background: #ff4929; }
+body[data-chapter] #win .level-link:hover { background: #fff8e9; }
+#intro-guide button:active, body[data-chapter] #win button:active, body[data-chapter] #win .level-link:active { box-shadow: inset 0 0 0 2px var(--button-trim), inset 0 5px 0 #0003; }
+#intro-guide button:focus-visible, body[data-chapter] #win button:focus-visible, body[data-chapter] #win .level-link:focus-visible { outline: none; box-shadow: inset 0 0 0 3px var(--station-cream), inset 0 0 0 6px var(--station-ink); }
 #intro-guide:focus, #win:focus { outline: none; }
+@keyframes intro-fade { from { opacity: 0; } to { opacity: 1; } }
+@media (max-width: 480px) {
+ #intro-guide section, #win .station-dialog { padding: 26px 18px 22px; }
+ .dialog-brand { font-size: 10px; margin-bottom: 14px; }
+ #intro-guide .intro-progress { margin-bottom: 18px; }
+ #intro-guide h1, body[data-chapter] #win h1 { font-size: clamp(22px, 6.5vw, 29px); margin-bottom: 18px; }
+ #intro-guide p, body[data-chapter] #win p { font-size: 15px; line-height: 1.6; margin-bottom: 22px; }
+}
+@media (max-width: 360px) { #intro-guide button, body[data-chapter] #win button { font-size: 16px; padding-inline: 12px; gap: 10px; } }
+@media (prefers-reduced-motion: reduce) { #intro-guide, body[data-chapter] #win { animation: none; backdrop-filter: none; } #intro-guide .intro-progress::before { transition: none; } }
+
 .completion-sparkles { position: absolute; left: 50%; top: 42%; width: 0; height: 0; pointer-events: none; }
-.completion-sparkles i { position: absolute; width: 4px; height: 7px; border-radius: 2px; background: #f5d783; box-shadow: 0 0 9px #ffdb87aa; opacity: 0; animation: completion-spark 2.4s ease-out var(--delay) both; }
+.completion-sparkles i { position: absolute; width: 4px; height: 7px; border-radius: 0; background: var(--station-yellow); box-shadow: 0 0 9px #ffdb87aa; opacity: 0; animation: completion-spark 2.4s ease-out var(--delay) both; }
 @keyframes completion-spark { 0% { opacity: 0; transform: translate(0,0) scale(.3); } 18% { opacity: .9; } 100% { opacity: 0; transform: translate(var(--x),var(--y)) rotate(120deg) scale(.5); } }
+
+.completion-sparkles i:nth-child(3n) { background: var(--station-red); }
+.completion-sparkles i:nth-child(3n + 1) { background: #67a9db; }
