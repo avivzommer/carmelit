@@ -107,7 +107,8 @@ export function createMechanicLayout(chapter=1,builders={}){
  // Maintenance stairs descend below the entire moving train and cable envelope.
  for(const side of [-1,1]){
   const id=side===far?'dockFar':'dockNear';
-  const outer=Math.max(3.58,stairX+.65);deck(side*(2.08+outer)/2,MID,.1,outer-2.08,.95,id);
+  const outer=Math.max(3.58,stairX+.65),front=stairX>3?1.075:.575;
+  deck(side*(2.08+outer)/2,MID,(front-.375)/2,outer-2.08,front+.375,id);
   // Full-depth treads keep the mechanic clear of the preceding riser while
   // descending. Derive both the mesh and waypoints from the same stair span.
   const path=[[side*2.7,MID,0]];if(stairX!==2.7)path.push([side*stairX,MID,0]);path.push([side*stairX,MID,-.3]);const steps=12;

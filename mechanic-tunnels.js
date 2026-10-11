@@ -71,12 +71,16 @@ export function createPassageScenery(layout){
   stairWall(service,path,.52);
  }
  const serviceY=layout.floors.repair[1],serviceZ=layout.floors.repair[2];
- bundle(service,[[-1.70,serviceY+.40,serviceZ+.30],[0,serviceY+.40,serviceZ+.30],[1.70,serviceY+.40,serviceZ+.30]]);
- for(const x of [-1.70,1.70])box(service,x,serviceY+.49,serviceZ+.30,.16,.22,.07,blue,'Cable junction box');
+ const serviceOuter=Math.max(...[...layout.stairPaths.values()].map(path=>Math.abs(path.at(-1)[0])));
+ const extendedService=serviceOuter>3;
+ const conduitZ=serviceZ+(extendedService?-.36:.30);
+ bundle(service,[[-(extendedService?serviceOuter:1.70),serviceY+.40,conduitZ],[0,serviceY+.40,conduitZ],[(extendedService?serviceOuter:1.70),serviceY+.40,conduitZ]]);
+ for(const x of [-1.70,1.70])box(service,x,serviceY+.49,conduitZ,.16,.22,.07,blue,'Cable junction box');
  // A recessed utility bay wraps the existing repair cabinet. The open front
  // and wide entrance leave both its approach and swinging door clear.
  for(const side of [-1,1]){
-  wall(service,side*1.71,serviceY-.08,serviceZ-.44,1.86,1.18,.12);
+  const outer=extendedService?serviceOuter+.55:2.64;
+  wall(service,side*(.78+outer)/2,serviceY-.08,serviceZ-.44,outer-.78,1.18,.12);
   wall(service,side*.77,serviceY-.08,serviceZ-.70,.10,1.18,.58);
  }
  wall(service,0,serviceY-.08,serviceZ-1.02,1.64,1.34,.13);

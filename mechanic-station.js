@@ -5,7 +5,7 @@ import {createPassageScenery} from './mechanic-tunnels.js';
 
 // The station is built around a recessed railway. This is physical architecture,
 // included in the movement guard, with no scenery placed across a walking route.
-export function createSteppedStation(layout){
+export function createSteppedStation(layout,{wheelWallBays=false}={}){
  const root=new THREE.Group();root.name='Stepped Carmelit station';
  const mats=new Map(),fixtures=[],rollers=[];
  const material=(color)=>{if(!mats.has(color))mats.set(color,new THREE.MeshStandardMaterial({color,roughness:.83}));return mats.get(color);};
@@ -164,9 +164,11 @@ export function createSteppedStation(layout){
  for(const [i,z]of [3.7,.45,-2.35,-4.85].entries()){
   const y=bankTop(-1,z)+.02;
   const lampLift=.65;
-  box(-4.758,y+.665,z,.04,1.33,.54,colors.blue);
-  box(-4.73,y+.665,z,.025,1.19,.43,colors.steel);
-  box(-4.705,y+.69,z-.14,.035,.11,.035,colors.yellow);
+  if(!wheelWallBays||![.45,-2.35].includes(z)){
+   box(-4.758,y+.665,z,.04,1.33,.54,colors.blue,root,'Station access door frame');
+   box(-4.73,y+.665,z,.025,1.19,.43,colors.steel,root,'Station access door');
+   box(-4.705,y+.69,z-.14,.035,.11,.035,colors.yellow,root,'Station access door handle');
+  }
   // Projecting wall sconces read as real bulbs even at phone scale.
   const standby=i===0||i===2;
   const lampMat=new THREE.MeshStandardMaterial({color:0xffefd1,emissive:0xffd18a,emissiveIntensity:standby?1.7:0,roughness:.35});

@@ -295,3 +295,26 @@ test('protected terminal wall remains opaque during player cutaways',()=>{
  for(let i=0;i<60;i++)cutaway.update(camera,new THREE.Vector3(),1/60);
  assert.equal(wall.material.opacity,1);assert.equal(wall.material.depthWrite,true);assert.equal(wall.material.transparent,false);
 });
+
+test('cached collision bounds follow moving and scaled walls and still respect visibility',()=>{
+ const root=new THREE.Group(),wall=new THREE.Mesh(new THREE.BoxGeometry(.1,1,1),new THREE.MeshStandardMaterial());
+ wall.position.set(3,.5,0);root.add(wall);const guard=createWalkGuard([root]),feet=new THREE.Vector3();
+ assert.equal(guard.blocker(feet),null);
+ wall.position.x=0;guard.refresh();assert.equal(guard.blocker(feet),wall,'a moved wall enters the local collision cells');
+ wall.visible=false;assert.equal(guard.blocker(feet),null,'opening gates can hide without rebuilding static geometry');
+ wall.visible=true;wall.position.x=.7;wall.scale.x=15;guard.refresh();assert.equal(Boolean(guard.blocker(feet)),true,'resizing geometry updates its broad-phase bounds');
+ wall.position.x=5;guard.refresh();assert.equal(guard.blocker(feet),null,'old collision cells do not leave invisible blockers');
+});
+
+test('cutaway broad phase skips distant meshes and updates when an obstruction moves into view',()=>{
+ const root=new THREE.Group(),camera=new THREE.PerspectiveCamera();camera.position.set(0,.55,5);camera.lookAt(0,.55,0);camera.updateMatrixWorld(true);
+ for(let i=0;i<50;i++){const mesh=new THREE.Mesh(new THREE.BoxGeometry(1,1,.1),new THREE.MeshStandardMaterial());mesh.position.set(10+i,.5,1);root.add(mesh);}root.updateMatrixWorld(true);
+ let calls=0;const original=THREE.Mesh.prototype.raycast;
+ try{
+  THREE.Mesh.prototype.raycast=function(...args){calls++;return original.apply(this,args);};
+  const cutaway=createPlayerCutaway([root]);cutaway.update(camera,new THREE.Vector3(),1/60);assert.equal(calls,0,'meshes outside the view ray need no triangle raycast');
+  root.children[0].position.x=0;root.updateMatrixWorld(true);
+  for(let i=0;i<60;i++)cutaway.update(camera,new THREE.Vector3(),1/60);
+  assert.equal(calls,60);assert.ok(root.children[0].material.opacity<.25,'moving blockers still reveal the player');
+ }finally{THREE.Mesh.prototype.raycast=original;}
+});

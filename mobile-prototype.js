@@ -1,12 +1,12 @@
 import {closestTouchTarget} from './mobile-interaction.js';
-import {createPlatformWheel,createCabControls,addCabinetWrench,createInteractionHalo,wheelTravel,carriageStep} from './mobile-machinery.js?cabin-controls=2';
+import {createStationWheels,createCabControls,addCabinetWrench,createInteractionHalo,wheelTravel,carriageStep} from './mobile-machinery.js?station-clearance=2';
 import {createFloorWalker} from './mobile-wander.js?free-walk=1';
 import {createRunout,createDepartureRunout,applyDepartureFade} from './mechanic-runout.js';
 import * as THREE from 'three';
 import {createMechanicJourney} from './mechanic-state.mjs?free-walk=1';
-import {createMechanicLayout} from './mechanic-layout.js?free-walk=1';
-import {createSteppedStation} from './mechanic-station.js';
-import {createWalkGuard,createPlayerCutaway,cabinetWorkOffset} from './mechanic-clearance.js';
+import {createMechanicLayout} from './mechanic-layout.js?station-clearance=2';
+import {createSteppedStation} from './mechanic-station.js?station-clearance=2';
+import {createWalkGuard,createPlayerCutaway,cabinetWorkOffset} from './mechanic-clearance.js?spatial-cache=1';
 import {advanceWalkStep} from './mechanic-walk.js';
 import {createRestoration} from './mechanic-restoration.js';
 import {createTrack,trainPosition,STATION_Y,TERMINAL_Z,LINE_CLIP_PLANES,departureTravel,deckHeightAtZ} from './mechanic-track.js';
@@ -27,7 +27,7 @@ try {
   document.body.append(message);
   throw error;
 }
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setPixelRatio(Math.min(devicePixelRatio,matchMedia('(pointer:coarse)').matches?1.5:2));
 renderer.shadowMap.enabled = true;
 renderer.localClippingEnabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -167,7 +167,7 @@ const near=chapter===2?1:-1;
 const HIGH=STATION_Y[2];
 const carriages=[],buttons=[],signals=[],cabinets=[],powerPulses=[];
 const layout=createMechanicLayout(chapter,{box,mesh,serviceStairX:3.8});scene.add(layout.root);
-const station=chapter===2?createSteppedStation(layout):null;
+const station=chapter===2?createSteppedStation(layout,{wheelWallBays:true}):null;
 if(station)scene.add(station.root);
 const {floors}=layout;
 const atmosphere=createUndergroundAtmosphere({scene,renderer,ambient,sunlight,fill,passages:layout.passages,
@@ -316,8 +316,7 @@ function updatePowerPulses(dt){
 const restoration=createRestoration({near,floors,stairPaths:layout.stairPaths,terminalZ:chapter===2?TERMINAL_Z:null});scene.add(restoration.root);
 // Repairs use cabinets. Separate platform wheels haul the cable-linked carts.
 const {serviceWheel}=layout;serviceWheel.visible=false;
-const wheelSpecs=[['station1',1,4.40,4.10,3.90,4.10],['station2Far',0,-3.85,-2.65,-3.35,-2.65],['station2Near',1,3.85,-2.65,3.35,-2.65],['dockFar',0,-3.42,.40,-2.90,.35],['dockNear',1,3.42,.40,2.90,.35]];
-const platformWheels=wheelSpecs.map(([id,car,x,z,ax,az],i)=>{const y=floors[id][1],model=createPlatformWheel(new THREE.Vector3(x,y,z),i);scene.add(model.root);return {...model,id,car,approach:new THREE.Vector3(ax,y,az)};});
+const platformWheels=createStationWheels(layout);platformWheels.forEach(model=>scene.add(model.root));
 const cabControls=trainModels.map(createCabControls);
 const cabinetHalos=cabinets.map(c=>{const halo=createInteractionHalo(c.root.position,.37);halo.userData.focusLayer=c.root.userData.focusLayer;scene.add(halo);return halo;});
 const tapRipple=createInteractionHalo(new THREE.Vector3(),.12);tapRipple.visible=false;scene.add(tapRipple);let rippleTime=0;
@@ -475,10 +474,12 @@ function measure(){scene.updateMatrixWorld(true);camera.updateMatrixWorld(true);
 positions(-.58);measure();positions(2.58);measure();positions(1);updateBoarding();measure();
 const size=screenBounds.getSize(new THREE.Vector2()),center=screenBounds.getCenter(new THREE.Vector2());
 let introFocus=0,departureFocus=0;
-let overview=false,mobileCenter=null,mobileWidth=6;
+let overview=false,mobileCenter=null,mobileWidth=6,viewportRect=null,renderWidth=0,renderHeight=0;
 function resize(){
- const rect=canvas.getBoundingClientRect();
- renderer.setSize(rect.width,rect.height,false);
+ const rect=viewportRect??(viewportRect=canvas.getBoundingClientRect());
+ // Camera tracking runs every frame; resetting the drawing buffer must only
+ // happen when the viewport actually changes size.
+ if(rect.width!==renderWidth||rect.height!==renderHeight){renderer.setSize(rect.width,rect.height,false);renderWidth=rect.width;renderHeight=rect.height;}
  if(overview){
   Object.assign(camera,fittedView({x:size.x*.98,y:size.y*.98},center,rect.width,rect.height,{top:72,bottom:16,left:12,right:12}));
  }else{
@@ -514,6 +515,7 @@ function beginWheel(){
 function wheelAngle(e){const w=platformWheels[activeWheel],p=w.rotor.getWorldPosition(new THREE.Vector3()).project(camera);return Math.atan2(e.clientY-(1-p.y)*canvas.clientHeight/2,e.clientX-(p.x+1)*canvas.clientWidth/2);}
 function finishWheel(){if(animation?.type==='wheelDrive')animation.released=true;wheelGesture=null;}
 document.querySelector('#overview').onclick=()=>{if(game.state.motion?.type==='wheelDrive')return;overview=!overview;closeWheel();document.querySelector('#overview').setAttribute('aria-pressed',String(overview));document.querySelector('#overview').textContent=overview?'⌖':'◇';document.querySelector('#overview').setAttribute('aria-label',overview?'Back to player':'Overview');resize();};
+const progressDots=[...document.querySelectorAll('#repair-progress span')];let shownProgress='',shownBusy=null;
 function updateMobileJourney(dt){
  const motion=game.state.motion?.type,busy=Boolean(motion),aboard=['carA','carB'].includes(game.state.location);
  const focusWorld=person.position.clone().add(new THREE.Vector3(0,.65,0));
@@ -530,14 +532,15 @@ function updateMobileJourney(dt){
  cabinetHalos.forEach((halo,i)=>{const available=i===0?['entrance','station1'].includes(game.state.location):i===1?game.state.location.startsWith('station2'):game.state.location==='repair';halo.visible=available&&!overview&&!busy;halo.material.color.setHex(game.state.pressed[i]?0xa9dbb4:0xffdc83);halo.material.opacity=game.state.pressed[i]?.22:.30+.12*Math.sin(performance.now()*.0025);});
  if(rippleTime>0){rippleTime-=dt;tapRipple.scale.setScalar(1+(1-rippleTime/.65)*2);tapRipple.material.opacity=Math.max(0,rippleTime/.65)*.55;}else tapRipple.visible=false;
  cabControls.forEach((cab,i)=>{const inside=game.state.location===(i?'carB':'carA');cab.controls.forEach(c=>{const selected=inside&&busy&&c.up===activeCabDirection;c.material.emissiveIntensity=selected?.8:inside&&!busy&&carriageStep(game.state.stop,i,c.up)!==game.state.stop?.5:.05;c.button.position.y=selected?.19:.23;});});
- document.querySelectorAll('#repair-progress span').forEach((dot,i)=>{dot.classList.toggle('on',game.state.pressed[i]);dot.setAttribute('aria-label',`Repair ${i+1}: ${game.state.pressed[i]?'complete':'pending'}`);});
- canvas.style.cursor=busy?'default':'pointer';
+ const progress=game.state.pressed.join(',');if(progress!==shownProgress){shownProgress=progress;progressDots.forEach((dot,i)=>{dot.classList.toggle('on',game.state.pressed[i]);dot.setAttribute('aria-label',`Repair ${i+1}: ${game.state.pressed[i]?'complete':'pending'}`);});}
+ if(busy!==shownBusy){shownBusy=busy;canvas.style.cursor=busy?'default':'pointer';}
 
 }
 
 if(chapter===1)addBackgroundScenery(scene,camera,target);
-window.addEventListener('resize',resize);resize();reset();startEntrance();
-window.visualViewport?.addEventListener('resize',resize);
+function viewportChanged(){viewportRect=null;resize();}
+window.addEventListener('resize',viewportChanged);resize();reset();startEntrance();
+window.visualViewport?.addEventListener('resize',viewportChanged);
 
 function startEntrance(){
  game.state.motion={type:'intro'};

@@ -1,5 +1,6 @@
 import * as THREE from './vendor/three.module.js';
 import {TRAIN_SLOPE} from './mechanic-track.js';
+import {applyDepartureFade} from './mechanic-runout.js';
 export function wheelTravel(start,angle,index){return THREE.MathUtils.clamp(start+angle/Math.PI*(index?-1:1),0,2);}
 export function carriageStep(stop,index,up){return THREE.MathUtils.clamp(stop+(up?1:-1)*(index?-1:1),0,2);}
 export function createPlatformWheel(position,index){
@@ -16,6 +17,14 @@ export function createPlatformWheel(position,index){
  root.traverse(o=>{if(o.isMesh)o.userData.platformWheel=index;});
  return {root,rotor,rimMaterial:yellow};
 }
+export function createStationWheels(layout){
+ const specs=[['station1',1,4.40,4.10],['station2Far',0,-3.95,-2.50],['station2Near',1,3.95,-2.50],['dockFar',0,-4.25,.75],['dockNear',1,4.25,.75]];
+ return specs.map(([id,car,x,z],index)=>{
+  const side=Math.sign(x),y=layout.floors[id][1],model=createPlatformWheel(new THREE.Vector3(x,y,z),index);
+  model.root.rotation.y=-side*Math.PI/2;
+  return {...model,id,car,approach:new THREE.Vector3(x-side*.52,y,z)};
+ });
+}
 export function createCabControls(train,index){
  const root=new THREE.Group();root.name='Cabin uphill and downhill controls';train.root.add(root);
  const controls=[];
@@ -31,6 +40,9 @@ export function createCabControls(train,index){
   control.traverse(o=>{if(o.isMesh){o.userData.cabDirection=up;o.userData.trainIndex=index;}});
   controls.push({root:control,button,material,up});
  }
+ // Consoles are attached after the train shell is prepared, so they need the
+ // same world-space departure shader on every face, including arrow glyphs.
+ root.traverse(o=>{if(o.isMesh)for(const mat of Array.isArray(o.material)?o.material:[o.material]){applyDepartureFade(mat);mat.clipShadows=true;}});
  return {root,controls};
 }
 export function addCabinetWrench(cabinet){

@@ -6,15 +6,16 @@ export const cabinetWorkOffset=new THREE.Vector3(.36,0,.45);
 // Check actual triangles, not the bounding box of an arch (which includes its
 // doorway). Swept samples prevent a slow frame from jumping through a thin wall.
 export function createWalkGuard(roots){
- const meshes=[],bounds=new THREE.Box3(),body=new THREE.Box3(),triangle=new THREE.Triangle();
- for(const root of roots)root.traverse(o=>{if(o.isMesh&&o.geometry?.attributes.position&&!o.userData.visualEffect)meshes.push(o);});
+ const meshes=[],body=new THREE.Box3(),triangle=new THREE.Triangle(),cells=new Map(),nearby=new Set(),cellSize=.8;
+ for(const root of roots)root.traverse(o=>{if(o.isMesh&&o.geometry?.attributes.position&&!o.userData.visualEffect)meshes.push({mesh:o,bounds:new THREE.Box3(),matrix:null,keys:[]});});
+ function visitCells(box,visit){for(let x=Math.floor(box.min.x/cellSize);x<=Math.floor(box.max.x/cellSize);x++)for(let y=Math.floor(box.min.y/cellSize);y<=Math.floor(box.max.y/cellSize);y++)for(let z=Math.floor(box.min.z/cellSize);z<=Math.floor(box.max.z/cellSize);z++)visit(`${x},${y},${z}`);}
  function blocker(point){
   body.min.set(point.x-WALKER.radius,point.y+WALKER.stepHeight,point.z-WALKER.radius);
   body.max.set(point.x+WALKER.radius,point.y+WALKER.height,point.z+WALKER.radius);
-  for(const mesh of meshes){
+  nearby.clear();visitCells(body,key=>{for(const item of cells.get(key)||[])nearby.add(item);});
+  for(const {mesh,bounds} of nearby){
    let visible=true;for(let o=mesh;o;o=o.parent)if(!o.visible){visible=false;break;}if(!visible)continue;
-   const g=mesh.geometry;if(!g.boundingBox)g.computeBoundingBox();
-   bounds.copy(g.boundingBox).applyMatrix4(mesh.matrixWorld);if(!bounds.intersectsBox(body))continue;
+   const g=mesh.geometry;if(!bounds.intersectsBox(body))continue;
    const pos=g.attributes.position,index=g.index,count=index?index.count:pos.count;
    for(let i=0;i<count;i+=3){
     triangle.a.fromBufferAttribute(pos,index?index.getX(i):i).applyMatrix4(mesh.matrixWorld);
@@ -29,7 +30,16 @@ export function createWalkGuard(roots){
   const count=Math.max(1,Math.ceil(from.distanceTo(to)/.06)),p=new THREE.Vector3();
   for(let i=0;i<=count;i++){const hit=blocker(p.lerpVectors(from,to,i/count));if(hit)return hit;}return null;
  }
- function refresh(){roots.forEach(root=>root.updateWorldMatrix(true,true));}
+ function refresh(){
+  roots.forEach(root=>root.updateWorldMatrix(true,true));
+  for(const item of meshes){const {mesh}=item;if(item.matrix?.equals(mesh.matrixWorld))continue;
+   for(const key of item.keys){const bucket=cells.get(key);bucket.delete(item);if(!bucket.size)cells.delete(key);}item.keys.length=0;
+   const g=mesh.geometry;if(!g.boundingBox)g.computeBoundingBox();item.bounds.copy(g.boundingBox).applyMatrix4(mesh.matrixWorld);
+   (item.matrix??=new THREE.Matrix4()).copy(mesh.matrixWorld);
+   visitCells(item.bounds,key=>{if(!cells.has(key))cells.set(key,new Set());cells.get(key).add(item);item.keys.push(key);});
+  }
+ }
+ refresh();
  return {blocker,segmentBlocker,refresh};
 }
 
@@ -46,10 +56,10 @@ export function passageAt(feet,passages){
  return null;
 }
 export function createPlayerCutaway(roots,{passages=[]}={}){
- const candidates=[],ray=new THREE.Raycaster(),clones=new Map(),bounds=new THREE.Box3();
+ const candidates=[],ray=new THREE.Raycaster(),clones=new Map(),hits=[];
  let active=null,strength=0;
  function inherited(mesh,key){for(let p=mesh;p;p=p.parent)if(p.userData[key]!==undefined)return p.userData[key];}
- for(const root of roots)root.traverse(mesh=>{if(mesh.isMesh&&!inherited(mesh,'alwaysVisible')){const cast=THREE.Mesh.prototype.raycast;candidates.push({mesh,cast,fade:1,materials:null,shadow:mesh.castShadow});}});
+ for(const root of roots)root.traverse(mesh=>{if(mesh.isMesh&&!inherited(mesh,'alwaysVisible')){const cast=THREE.Mesh.prototype.raycast;candidates.push({mesh,cast,fade:1,materials:null,shadow:mesh.castShadow,bounds:new THREE.Box3(),matrix:null});}});
  function update(camera,feet,dt,{surfaceReveal=0}={}){
   const passage=passageAt(feet,passages);
   if(passage)active=passage;
@@ -60,13 +70,15 @@ export function createPlayerCutaway(roots,{passages=[]}={}){
   for(const item of candidates){
    const {mesh,cast}=item;let visible=true;for(let p=mesh;p;p=p.parent)if(!p.visible){visible=false;break;}
    const protectedPassage=active&&inherited(mesh,'focusLayer')===active.id;
-   const roof=inherited(mesh,'occupancyRoof'),hits=[];
-   if(visible&&!protectedPassage&&!roof)cast.call(mesh,ray,hits);
+   const roof=inherited(mesh,'occupancyRoof');hits.length=0;
+   if(!item.matrix?.equals(mesh.matrixWorld)){
+    if(!mesh.geometry.boundingBox)mesh.geometry.computeBoundingBox();
+    item.bounds.copy(mesh.geometry.boundingBox).applyMatrix4(mesh.matrixWorld);(item.matrix??=new THREE.Matrix4()).copy(mesh.matrixWorld);
+   }
+   if(visible&&!protectedPassage&&!roof&&!inherited(mesh,'cutawayProtected')&&ray.ray.intersectsBox(item.bounds))cast.call(mesh,ray,hits);
    let target=protectedPassage?1:hits.length?.18:1;
    if(active&&!protectedPassage){
-    if(!mesh.geometry.boundingBox)mesh.geometry.computeBoundingBox();
-    bounds.copy(mesh.geometry.boundingBox).applyMatrix4(mesh.matrixWorld);
-    if(bounds.max.y>active.floor+.10)target=Math.min(target,THREE.MathUtils.lerp(1,.09,strength));
+    if(item.bounds.max.y>active.floor+.10)target=Math.min(target,THREE.MathUtils.lerp(1,.09,strength));
    }
    target*=inherited(mesh,'viewOpacity')??1;
    if(inherited(mesh,'cutawayProtected'))target=1;

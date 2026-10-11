@@ -6,7 +6,7 @@ import {createSteppedStation} from './mechanic-station.js';
 import {createCarmelitTrain} from './mechanic-train.js';
 import {createRepairCabinet} from './mechanic-repair.js';
 import {createWalkGuard,createPlayerCutaway} from './mechanic-clearance.js';
-import {createPlatformWheel,createCabControls,addCabinetWrench,wheelTravel,carriageStep} from './mobile-machinery.js';
+import {createStationWheels,createCabControls,addCabinetWrench,wheelTravel,carriageStep} from './mobile-machinery.js';
 import {createFloorWalker} from './mobile-wander.js';
 import {closestTouchTarget} from './mobile-interaction.js';
 import {createMechanicJourney} from './mechanic-state.mjs';
@@ -19,18 +19,17 @@ test('wheel direction reverses carts, allows wrong-way travel and clamps endpoin
  assert.equal(carriageStep(1,1,true),0);assert.equal(carriageStep(1,0,true),2);
 });
 test('physical wheel approaches remain clear while both carts move, and deck wandering avoids cabinets',()=>{
- const layout=createMechanicLayout(2,{serviceStairX:3.8}),station=createSteppedStation(layout);layout.serviceWheel.visible=false;
+ const layout=createMechanicLayout(2,{serviceStairX:3.8}),station=createSteppedStation(layout,{wheelWallBays:true});layout.serviceWheel.visible=false;
  const trains=[0,1].map(i=>createCarmelitTrain(i,{fullRoofCutaway:true}));trains.forEach(createCabControls);
  const cabinets=['station1','station2Far','repair'].map((id,i)=>{const c=createRepairCabinet(i);c.root.position.copy(layout.cabinetPosition(id));addCabinetWrench(c);return c;});
- const specs=[['station1',4.4,4.1,3.90,4.1],['station2Far',-3.85,-2.65,-3.35,-2.65],['station2Near',3.85,-2.65,3.35,-2.65],['dockFar',-3.42,.4,-2.90,.35],['dockNear',3.42,.4,2.90,.35]];
- const wheels=specs.map(([id,x,z],i)=>createPlatformWheel(new THREE.Vector3(x,layout.floors[id][1],z),i));
+ const wheels=createStationWheels(layout);
  const guard=createWalkGuard([layout.root,station.root,...trains.map(t=>t.root),...cabinets.map(c=>c.root),...wheels.map(w=>w.root)]);
  const walker=createFloorWalker(layout.surfaces,guard);layout.updateGates([true,true,true]);
  for(let t=0;t<=2;t+=.1){trains.forEach((train,i)=>{train.root.position.copy(trainPosition(i,t));train.updateBoarding(0,null,false,0,true);});guard.refresh();
-  for(const [id,,,x,z]of specs)assert.equal(Boolean(guard.blocker(new THREE.Vector3(x,layout.floors[id][1],z))),false,`${id} wheel approach must clear moving trains`);
+  for(const {id,approach}of wheels)assert.equal(Boolean(guard.blocker(approach)),false,`${id} wheel approach must clear moving trains`);
  }
- for(const [id,,,x,z]of specs){
-  const from=new THREE.Vector3(...layout.floors[id]),to=new THREE.Vector3(x,from.y,z),points=walker.path(from,to);
+ for(const {id,approach:to}of wheels){
+  const from=new THREE.Vector3(...layout.floors[id]),points=walker.path(from,to);
   assert.ok(points,`${id} wheel must be reachable on its platform`);
   let prior=from;for(const p of points){assert.equal(Boolean(guard.segmentBlocker(prior,p)),false);assert.ok(walker.supported(prior,p));prior=p;}
  }
@@ -41,6 +40,42 @@ test('physical wheel approaches remain clear while both carts move, and deck wan
  }
  const from=new THREE.Vector3(...layout.floors.station1),rail=new THREE.Vector3(1.25,from.y,3);
  assert.equal(walker.path(from,rail),null,'free walking cannot enter the track void');
+});
+
+test('wheel bays face the trains, clear the stair mouth and replace nearby false doorways',()=>{
+ const layout=createMechanicLayout(2,{serviceStairX:3.8}),station=createSteppedStation(layout,{wheelWallBays:true}),wheels=createStationWheels(layout);
+ for(const wheel of wheels){
+  wheel.root.updateMatrixWorld(true);
+  const normal=new THREE.Vector3(0,0,1).transformDirection(wheel.root.matrixWorld);
+  assert.ok(normal.x*Math.sign(wheel.root.position.x)<-.99,'wheel faces inward toward its train');
+  if(wheel.id.startsWith('dock')){
+   const mouth=new THREE.Vector3(...layout.stairPaths.get(wheel.id)[2]);
+   assert.ok(wheel.root.position.distanceTo(mouth)>.65,'pedestal and wheel stay away from stair opening');
+  }
+ }
+ const doors=[];station.root.traverse(o=>{if(o.name==='Station access door')doors.push(o.position.z);});
+ assert.deepEqual(doors,[3.7,-4.85],'wheel bays have tiled wall rather than an access door');
+});
+
+test('mobile basement wall continues from utility bay to both relocated stairs without blocking the passage',()=>{
+ const layout=createMechanicLayout(2,{serviceStairX:3.8}),station=createSteppedStation(layout),scenery=station.passageScenery;
+ station.root.updateMatrixWorld(true);
+ const y=layout.floors.repair[1],z=layout.floors.repair[2],walls=scenery.walls.map(m=>new THREE.Box3().setFromObject(m));
+ for(const side of [-1,1])for(let x=.8;x<4.3;x+=.1)assert.ok(walls.some(b=>b.containsPoint(new THREE.Vector3(side*x,y+.5,z-.44))),'continuous wall behind underground walkway');
+ const guard=createWalkGuard([scenery.root]);
+ assert.equal(guard.segmentBlocker(new THREE.Vector3(-3.8,y,z),new THREE.Vector3(3.8,y,z)),null,'the wall stays beside the walking route');
+});
+
+test('all cabin console faces and arrow glyphs share the train departure fade, including cutaway copies',()=>{
+ const train=createCarmelitTrain(1,{fullRoofCutaway:true}),cab=createCabControls(train,1),camera=new THREE.OrthographicCamera(-3,3,3,-3,.1,100);
+ camera.position.set(24,24*Math.SQRT2,24);camera.lookAt(0,0,0);camera.updateMatrixWorld();train.root.updateMatrixWorld(true);
+ const cutaway=createPlayerCutaway([train.root]);
+ for(let frame=0;frame<60;frame++)cutaway.update(camera,new THREE.Vector3(),1/60);
+ cab.root.traverse(o=>{if(!o.isMesh)return;for(const mat of Array.isArray(o.material)?o.material:[o.material]){
+  assert.equal(mat.userData.departureFade,true);assert.equal(mat.transparent,true);
+  const shader={vertexShader:'#include <begin_vertex>',fragmentShader:'#include <color_fragment>'};mat.onBeforeCompile(shader);
+  assert.match(shader.fragmentShader,/smoothstep\(7.4,11.0,-departureZ\)/,'both console bases and button arrows dissolve beyond the tunnel');
+ }});
 });
 
 test('mobile boarding and walking never auto-repair cabinets',()=>{
