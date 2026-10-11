@@ -240,3 +240,71 @@ test('unexpected repair obstruction cancels safely and leaves a route to walk aw
  for(let i=0;i<240;i++){step.time+=1/60;const frame=advanceRepairMovement(step,position,1/60,guard,c);assert.equal(frame.blocker,null);if(frame.t===1){cancelled=false;break;}}
  assert.equal(cancelled,false,'a fresh attempt succeeds after the obstruction clears');
 });
+
+test('one upper left calling wheel is sufficient for the complete mobile puzzle',()=>{
+ const wheels=createStationWheels(createMechanicLayout(2,{serviceStairX:3.8}));
+ assert.deepEqual(wheels.map(w=>[w.id,w.car]),[['station2Far',0]],'remove every redundant wheel, including both stair landings');
+ const game=createMechanicJourney(2,{autoRepair:false});
+ const walk=id=>{assert.ok(game.walk(id),`walk to ${id}`);assert.ok(game.finishWalk());};
+ const repair=index=>{game.state.motion={type:'repair',index};assert.ok(game.finishRepair());};
+ const ride=(car,up)=>{assert.equal(game.state.location,car);assert.ok(game.beginDrag());assert.ok(game.release(carriageStep(game.state.stop,car==='carB'?1:0,up)));assert.ok(game.finishSlide());};
+ walk('station1');repair(0);walk('carB');ride('carB',true);ride('carB',true);
+ walk('station2Near');walk('station2Far');repair(1);
+ assert.equal(game.landingFor('carA'),null,'the second cart is away, so the calling wheel has a purpose');
+ assert.ok(game.beginDrag());assert.ok(game.release(wheelTravel(game.state.stop,Math.PI*2,wheels[0].car)));assert.ok(game.finishSlide());
+ assert.equal(game.landingFor('carA'),'station2Far');walk('carA');ride('carA',false);
+ walk('dockFar');walk('repair');repair(2);walk('dockNear');walk('carB');ride('carB',true);
+ assert.equal(game.state.motion.type,'departure');assert.ok(game.finishDeparture());assert.equal(game.state.complete,true);
+});
+
+test('vertical cabin swipes support either direction without hijacking taps or other surfaces',async()=>{
+ const {cabinSwipe}=await import('./mobile-interaction.js'),start={x:120,y:200};
+ for(const car of ['carA','carB']){
+  assert.equal(cabinSwipe(start,{x:131,y:150},car,{destination:car}),true);
+  assert.equal(cabinSwipe(start,{x:110,y:250},car,{destination:car}),false);
+  assert.equal(cabinSwipe(start,{x:120,y:150},car,{up:false}),true,'swiping over a button follows the finger, not its glyph');
+  assert.equal(cabinSwipe(start,{x:120,y:230},car,{destination:car}),null,'short jitter does not drive');
+  assert.equal(cabinSwipe(start,{x:180,y:150},car,{destination:car}),null,'horizontal or diagonal gestures do not drive');
+  assert.equal(cabinSwipe(start,{x:120,y:150},car,{destination:car==='carA'?'carB':'carA'}),null);
+  assert.equal(cabinSwipe(start,{x:120,y:150},car,{floor:{},zone:'station1'}),null,'swiping a platform does not drive remotely');
+ }
+ assert.equal(cabinSwipe(start,{x:120,y:100},'station1',{destination:'carB'}),null);
+});
+
+test('stair taps beat oversized wheel padding while direct wheels and their broad grips remain usable',async()=>{
+ const {resolveTouchHit,gestureDistance}=await import('./mobile-interaction.js');
+ const wheel={x:100,y:100,radius:84,action:{wheel:0}},point={x:100,y:170};
+ const nearby=closestTouchTarget(point,[wheel],()=>true);
+ assert.ok(nearby,'finger is inside the forgiving grip');
+ for(const zone of ['stairs:dockFar','stairs:dockNear','upperPassage']){
+  const stair={floor:{x:1,y:0,z:1},zone};
+  assert.equal(resolveTouchHit(stair,nearby),stair,'real steps must win even with the wheel selected');
+  assert.equal(resolveTouchHit(null,nearby,stair),stair,'missed stair edge still snaps to the stairs');
+ }
+ assert.deepEqual(resolveTouchHit({wheel:0},nearby,{floor:{},zone:'upperPassage'}),{wheel:0},'the visible rim remains interactive');
+ assert.deepEqual(resolveTouchHit({floor:{},zone:'station2Far'},nearby),{wheel:0},'broad wheel grip still accepts surrounding floor');
+ assert.ok(gestureDistance(point,{x:103,y:173})<=12,'small finger jitter stays a tap and never starts hauling');
+ assert.ok(gestureDistance(point,{x:130,y:170})>12,'a deliberate motion starts the wheel gesture');
+});
+
+test('removing redundant wheels leaves every reachable mobile configuration solvable, including wrong-way rides',()=>{
+ const journey=createMechanicJourney(2,{autoRepair:false}),states=new Map(),edges=new Map();
+ const key=s=>[s.location,s.stop,...s.pressed.map(Number)].join(':');
+ const initial={location:'entrance',stop:2,pressed:[false,false,false]},queue=[initial];states.set(key(initial),initial);
+ for(const state of queue){
+  Object.assign(journey.state,state,{motion:null,complete:false});const next=[];
+  for(const [a,b] of journey.connections()){
+   const destination=a===state.location?b:b===state.location?a:null;
+   if(destination)next.push({...state,location:destination});
+  }
+  const index=['station1','station2Far','repair'].indexOf(state.location);
+  if(index>=0&&!state.pressed[index])next.push({...state,pressed:state.pressed.map((v,i)=>v||i===index)});
+  if(state.pressed[0]&&(state.location.startsWith('car')||state.location==='station2Far'))for(const stop of [0,1,2])next.push({...state,stop});
+  edges.set(key(state),next.map(key));
+  for(const s of next)if(!states.has(key(s))){states.set(key(s),s);queue.push(s);}
+ }
+ const winning=new Set([...states].filter(([,s])=>s.location==='carB'&&s.stop===0&&s.pressed.every(Boolean)).map(([k])=>k));
+ let changed=true;while(changed){changed=false;for(const [k,next] of edges)if(!winning.has(k)&&next.some(n=>winning.has(n))){winning.add(k);changed=true;}}
+ assert.ok(states.size>50,'explores wrong turns and unrepaired boarding');
+ assert.equal(winning.size,states.size,'no platform becomes stranded when its wheel is removed');
+});

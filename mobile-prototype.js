@@ -1,7 +1,7 @@
-import {closestTouchTarget,createWheelGrip} from './mobile-interaction.js?touch-tolerance=1';
+import {closestTouchTarget,createWheelGrip,resolveTouchHit,gestureDistance,cabinSwipe} from './mobile-interaction.js?swipe-stairs=1';
 import {createShadowSchedule,createUndergroundResolution} from './mobile-performance.js';
 import {repairWorkPosition,advanceRepairMovement} from './mobile-repair.js';
-import {createStationWheels,createCabControls,addCabinetWrench,createInteractionHalo,wheelTravel,carriageStep} from './mobile-machinery.js?station-clearance=2';
+import {createStationWheels,createCabControls,addCabinetWrench,createInteractionHalo,wheelTravel,carriageStep} from './mobile-machinery.js?single-wheel=1';
 import {createFloorWalker} from './mobile-wander.js?touch-tolerance=1';
 import {createRunout,createDepartureRunout,applyDepartureFade} from './mechanic-runout.js';
 import * as THREE from 'three';
@@ -186,7 +186,7 @@ introCard.setAttribute('role','dialog');introCard.setAttribute('aria-modal','tru
 const introPanel=document.createElement('section'),introCount=document.createElement('div'),introTitle=document.createElement('h1'),introText=document.createElement('p'),introNext=document.createElement('button');
 introCount.className='intro-progress';introCount.setAttribute('role','progressbar');introCount.setAttribute('aria-label','Introduction progress');introCount.setAttribute('aria-valuemin','0');introCount.setAttribute('aria-valuemax','3');
 introTitle.id='intro-title';introNext.type='button';introPanel.append(introCount,introTitle,introText,introNext);introCard.append(introPanel);document.body.append(introCard);
-const introPages=[['Bring the line back to life','Tap a floor or stair to choose where to walk. Tap again to change direction or turn back. Repairs happen only when you tap a blue cabinet with a wrench. You can board an open cart before fixing the power, but it will not move yet. Turn platform wheels to call carts; use the arrow controls inside to ride. Restore all three cabinets to open the exit.']];
+const introPages=[['Bring the line back to life','Tap a floor or stair to choose where to walk. Tap again to change direction or turn back. Repairs happen only when you tap a blue cabinet with a wrench. You can board an open cart before fixing the power, but it will not move yet. Use the yellow wheel on the upper left platform to call the second cart. Inside a cart, swipe up or down to ride, or tap its arrow controls. Restore all three cabinets to open the exit.']];
 let introPage=0;
 let actionRevealTimer;
 function cancelActionReveal(){clearTimeout(actionRevealTimer);}
@@ -320,7 +320,7 @@ function updatePowerPulses(dt){
 }
 
 const restoration=createRestoration({near,floors,stairPaths:layout.stairPaths,terminalZ:chapter===2?TERMINAL_Z:null});scene.add(restoration.root);
-// Repairs use cabinets. Separate platform wheels haul the cable-linked carts.
+// Repairs use cabinets. The upper left handwheel calls the second cart.
 const {serviceWheel}=layout;serviceWheel.visible=false;
 const platformWheels=createStationWheels(layout);platformWheels.forEach(model=>scene.add(model.root));
 const cabControls=trainModels.map(createCabControls);
@@ -347,7 +347,7 @@ let travel=game.low,animation=null,repairRequested=false,afterWalk=null,activeWh
 const floorWalker=createFloorWalker(layout.surfaces,walkGuard,{waypoints:[...layout.stairPaths.values(),...layout.upperStairPaths.values()].flat()});
 function point(id){if(id==='carA'||id==='carB')return carriages[id==='carA'?0:1].position.clone();return vector(floors[id]);}
 function positions(t){travel=t;carriages.forEach((car,i)=>car.position.copy(trainPosition(i,t)));if(['carA','carB'].includes(game.state.location))person.position.copy(point(game.state.location));}
-function hint(){say(game.state.complete?'Level complete.':!game.state.pressed[0]?'Explore the platform and repair the blue power cabinet.':'Tap floors to explore. Turn a platform wheel to move the paired carts, or board and use the cabin controls.');}
+function hint(){say(game.state.complete?'Level complete.':!game.state.pressed[0]?'Explore the platform and repair the blue power cabinet.':'Tap floors to explore. Use the upper left wheel to call the second cart. Inside a cart, swipe up or down, or tap its arrow controls.');}
 
 function route(a,b){return layout.route(a,b,point);}
 function blockedWalkHint(id){
@@ -450,16 +450,10 @@ function targetVisible(target){
  return false;
 }
 function inputHit(e){
- // While holding a wheel, its grip area includes the surrounding floor and
- // carriage silhouette. Capture the finger until release, even far from the rim.
- if(activeWheel!==null){
-  const wheel=touchTargets().find(t=>t.action.wheel===activeWheel);
-  if(wheel&&Math.hypot(e.clientX-wheel.x,e.clientY-wheel.y)<=wheel.radius&&targetVisible(wheel))return wheel.action;
- }
  const exact=interactiveHit(e);
  if(exact&&!exact.floor)return exact;
  const nearby=closestTouchTarget({x:e.clientX,y:e.clientY},touchTargets(),targetVisible);
- return nearby?.action||exact||nearbyFloor(e);
+ return resolveTouchHit(exact,nearby,exact?null:nearbyFloor(e));
 }
 function nearbyFloor(e){
  pointerRay(e);
@@ -485,23 +479,37 @@ function nearbyFloor(e){
 }
 let tapStart=null;
 canvas.addEventListener('pointerdown',e=>{
- if(game.state.motion&&game.state.motion.type!=='wander'||overview)return;
- const h=activeWheel!==null?inputHit(e):null;
- if(activeWheel!==null&&h?.wheel===activeWheel){
-  if(!beginWheel())return;e.preventDefault();wheelGesture={id:e.pointerId,grip:createWheelGrip({x:e.clientX,y:e.clientY},wheelCenter()),start:travel};canvas.setPointerCapture(e.pointerId);tapStart=null;
- }else tapStart={x:e.clientX,y:e.clientY,id:e.pointerId};
+ if(!e.isPrimary||game.state.motion&&game.state.motion.type!=='wander'||overview||game.state.complete)return;
+ const hit=inputHit(e),location=game.state.location;
+ tapStart={x:e.clientX,y:e.clientY,id:e.pointerId,hit,location};
+ // Keep the large wheel grip, but do not close doors or haul anything on touch.
+ // A stair tap remains walking; a wheel drag starts only after deliberate motion.
+ if(activeWheel!==null&&hit?.wheel===activeWheel){
+  tapStart.wheel=activeWheel;tapStart.center=wheelCenter();
+ }
+ canvas.setPointerCapture(e.pointerId);
 });
 canvas.addEventListener('pointermove',e=>{
+ if(tapStart?.id===e.pointerId&&tapStart.wheel!==undefined&&gestureDistance(tapStart,{x:e.clientX,y:e.clientY})>12){
+  const start=tapStart;tapStart=null;
+  if(activeWheel!==start.wheel||!beginWheel())return;
+  wheelGesture={id:e.pointerId,grip:createWheelGrip(start,start.center),start:travel};
+ }
  if(!wheelGesture||e.pointerId!==wheelGesture.id)return;
  e.preventDefault();const total=wheelGesture.grip.move({x:e.clientX,y:e.clientY});animation.target=wheelTravel(wheelGesture.start,total,platformWheels[activeWheel].car);
 });
 canvas.addEventListener('pointerup',e=>{
  if(wheelGesture?.id===e.pointerId){finishWheel();return;}
- if(!tapStart||tapStart.id!==e.pointerId)return;const start=tapStart;tapStart=null;if(Math.hypot(e.clientX-start.x,e.clientY-start.y)>12)return;
+ if(!tapStart||tapStart.id!==e.pointerId)return;
+ const start=tapStart,end={x:e.clientX,y:e.clientY};tapStart=null;
+ if(start.location!==game.state.location)return;
+ const swipe=cabinSwipe(start,end,start.location,start.hit);
+ if(swipe!==null){driveCab(swipe);return;}
+ if(gestureDistance(start,end)>12)return;
  const h=inputHit(e);if(h?.wheel!==undefined)selectWheel(h.wheel);else if(h?.up!==undefined)driveCab(h.up);else if(h?.repair)requestWalk(h.repair,true);else if(h?.floor){if(game.state.location.startsWith('car')){const landing=game.landingFor(game.state.location);if(landing&&h.zone===landing)requestWalk(landing);}else{exploreFloor(h.floor.clone(),h.zone);}}else if(h?.destination)requestWalk(h.destination);
 });
 canvas.addEventListener('pointercancel',()=>{tapStart=null;finishWheel();});
-canvas.addEventListener('lostpointercapture',()=>{if(wheelGesture)finishWheel();});
+canvas.addEventListener('lostpointercapture',()=>{tapStart=null;if(wheelGesture)finishWheel();});
 window.addEventListener('keydown',e=>{if(e.key.toLowerCase()==='r'&&!(e.target instanceof HTMLButtonElement)){overview=false;reset();startEntrance();}});
 document.querySelector('#restart').onclick=()=>{overview=false;reset();startEntrance();};document.querySelector('#again').onclick=()=>{overview=false;reset();startEntrance();};let hintTimer;document.querySelector('#help').onclick=()=>{hint();document.body.classList.toggle('show-hint');clearTimeout(hintTimer);hintTimer=setTimeout(()=>document.body.classList.remove('show-hint'),6000);};
 // Fit both trains at both ends of their travel, including the departure, before adding scenery.
@@ -530,7 +538,7 @@ function resize(){
 }
 
 let wheelGesture=null;
-function closeWheel(){activeWheel=null;wheelGesture=null;}
+function closeWheel(){activeWheel=null;wheelGesture=null;tapStart=null;}
 function selectWheel(index){
  cancelWander();if(game.state.motion||game.state.location.startsWith('car'))return;
  const wheel=platformWheels[index];

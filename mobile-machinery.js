@@ -18,7 +18,8 @@ export function createPlatformWheel(position,index){
  return {root,rotor,rimMaterial:yellow};
 }
 export function createStationWheels(layout){
- const specs=[['station1',1,4.40,4.10],['station2Far',0,-3.95,-2.50],['station2Near',1,3.95,-2.50],['dockFar',0,-4.25,.75],['dockNear',1,4.25,.75]];
+ // The upper left platform is the only place a pedestrian needs to call a cart.
+ const specs=[['station2Far',0,-3.95,-2.50]];
  return specs.map(([id,car,x,z],index)=>{
   const side=Math.sign(x),y=layout.floors[id][1],model=createPlatformWheel(new THREE.Vector3(x,y,z),index);
   model.root.rotation.y=-side*Math.PI/2;
