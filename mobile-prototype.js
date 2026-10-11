@@ -1,5 +1,6 @@
 import {closestTouchTarget,createWheelGrip} from './mobile-interaction.js?touch-tolerance=1';
 import {createShadowSchedule,createUndergroundResolution} from './mobile-performance.js';
+import {repairWorkPosition,advanceRepairMovement} from './mobile-repair.js';
 import {createStationWheels,createCabControls,addCabinetWrench,createInteractionHalo,wheelTravel,carriageStep} from './mobile-machinery.js?station-clearance=2';
 import {createFloorWalker} from './mobile-wander.js?touch-tolerance=1';
 import {createRunout,createDepartureRunout,applyDepartureFade} from './mechanic-runout.js';
@@ -7,7 +8,7 @@ import * as THREE from 'three';
 import {createMechanicJourney} from './mechanic-state.mjs?free-walk=1';
 import {createMechanicLayout} from './mechanic-layout.js?station-clearance=2';
 import {createSteppedStation} from './mechanic-station.js?station-clearance=2';
-import {createWalkGuard,createPlayerCutaway,cabinetWorkOffset} from './mechanic-clearance.js?underground-cache=2';
+import {createWalkGuard,createPlayerCutaway} from './mechanic-clearance.js?underground-cache=2';
 import {advanceWalkStep} from './mechanic-walk.js';
 import {createRestoration} from './mechanic-restoration.js';
 import {createTrack,trainPosition,STATION_Y,TERMINAL_Z,LINE_CLIP_PLANES,departureTravel,deckHeightAtZ} from './mechanic-track.js';
@@ -372,7 +373,7 @@ function nextStep(){
   if(repairRequested&&repairIds.includes(game.state.location)&&!game.state.pressed[repairIds.indexOf(game.state.location)]&&!game.state.motion)game.state.motion={type:'repair',index:repairIds.indexOf(game.state.location)};
   if(game.state.motion?.type==='repair'){
    const index=game.state.motion.index,cabinet=cabinets[index],from=person.position.clone();
-   const work=cabinet.root.position.clone().add(cabinetWorkOffset);
+   const work=repairWorkPosition(cabinet,index);
    animation={type:'repair',index,from,work,continueTo:game.state.motion.continueTo,time:0,duration:3.2};
    say(['Opening the power cabinet. Restoring station power…','Opening the release cabinet. Repairing the train controls…','Opening the service cabinet. Repairing the cable drive…'][index]);
   }else if(game.state.motion?.type==='departure')depart();else {const done=afterWalk;afterWalk=null;if(done)done();else hint();}return;
@@ -612,16 +613,17 @@ function animate(){
    walked=frame.moved;if(frame.arrived)nextStep();
   }
   else if(kind==='repair'){
-   const pose=cabinets[animation.index].setProgress(t,false);
-   const next=new THREE.Vector3().lerpVectors(animation.from,animation.work,pose.approach);
-   walkGuard.refresh();
-   if(walkGuard.segmentBlocker(person.position,next)){animation.time-=dt;}
-   else person.position.copy(next);
-   walked=t<.22||t>.82;
+   const frame=advanceRepairMovement(animation,person.position,dt,walkGuard,cabinets[animation.index]),pose=frame.pose;
+   if(frame.cancelled){
+    animation=null;game.state.motion=null;repairRequested=false;afterWalk=null;repairTool.visible=false;settlePose();hint();
+    // The next frame accepts walking or a fresh repair tap, with no error popup.
+    return;
+   }
+   walked=!frame.blocker&&(t<.22||t>.82);
    if(walked){const delta=person.position.clone().sub(before);if(delta.lengthSq()>.000001)desiredHeading=Math.atan2(delta.x,delta.z);}
    else {const toward=cabinets[animation.index].root.position.clone().sub(person.position);desiredHeading=Math.atan2(toward.x,toward.z);}
    repairFrame={t,pose};
-   if(t===1){
+   if(t===1&&!frame.blocker){
     const continueTo=animation.continueTo;game.finishRepair({reveal:true});cabinets[animation.index].setProgress(1,true);animation=null;repairFrame=null;
     if(game.state.motion?.type==='reveal'){animation={type:'reveal',time:0,duration:restorationReveal(0,reducedMotion).duration,continueTo};say('All three repairs complete. Bringing the station back to life…');}
     else if(continueTo)walk(continueTo);else hint();

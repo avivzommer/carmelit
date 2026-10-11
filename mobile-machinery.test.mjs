@@ -197,3 +197,46 @@ test('underground resolution uses stable thresholds and restores surface detail'
  assert.equal(ratio(.2),1.5,'surface resolution returns after ascending');
  assert.equal(createUndergroundResolution(.8)(1),.8,'never upscale low-resolution devices');
 });
+
+test('mobile service repair clears the wall conduit through the entire approach, door swing and return',async()=>{
+ const {repairWorkPosition,advanceRepairMovement}=await import('./mobile-repair.js');
+ const layout=createMechanicLayout(2,{serviceStairX:3.8}),station=createSteppedStation(layout,{wheelWallBays:true});
+ layout.serviceWheel.visible=false;layout.updateGates([true,true,false]);
+ const wheels=createStationWheels(layout),cabinets=['station1','station2Far','repair'].map((id,index)=>{const c=createRepairCabinet(index);c.root.position.copy(layout.cabinetPosition(id));addCabinetWrench(c);return c;});
+ const guard=createWalkGuard([layout.root,station.root,...wheels.map(w=>w.root),...cabinets.map(c=>c.root)]);
+ const service=cabinets[2],from=new THREE.Vector3(...layout.floors.repair);
+ const previousWork=service.root.position.clone().add(new THREE.Vector3(.36,0,.45));
+ assert.equal(guard.blocker(previousWork)?.name,'Wall cable conduit','reproduce the reported final-repair deadlock');
+ for(const cadence of [[1/30],[1/60],[1/120],[.008,.024,.016,.05]])for(const [index,id]of ['station1','station2Far','repair'].entries()){
+  const c=cabinets[index],position=new THREE.Vector3(...layout.floors[id]);
+  const step={from:position.clone(),work:repairWorkPosition(c,index),time:0,duration:3.2};
+  let finished=false;
+  for(let i=0;i<1000;i++){
+   const dt=cadence[i%cadence.length];step.time+=dt;
+   const frame=advanceRepairMovement(step,position,dt,guard,c);
+   assert.equal(frame.blocker,null,`${id} repair must not stall at progress ${frame.t}`);
+   assert.equal(frame.cancelled,false);
+   if(frame.t===1){finished=true;break;}
+  }
+  assert.ok(finished,`${id} repair completes at every tested frame cadence`);
+  assert.ok(position.distanceTo(step.from)<.001,'mechanic returns to the chosen repair marker');
+ }
+});
+
+test('unexpected repair obstruction cancels safely and leaves a route to walk away and retry',async()=>{
+ const {repairWorkPosition,advanceRepairMovement}=await import('./mobile-repair.js');
+ const layout=createMechanicLayout(2,{serviceStairX:3.8}),station=createSteppedStation(layout,{wheelWallBays:true}),c=createRepairCabinet(2);
+ layout.serviceWheel.visible=false;layout.updateGates([true,true,false]);c.root.position.copy(layout.cabinetPosition('repair'));
+ const obstacle=new THREE.Mesh(new THREE.BoxGeometry(.08,.8,.08));obstacle.position.set(.36,1.25,-3.32);
+ const guard=createWalkGuard([layout.root,station.root,c.root,obstacle]),position=new THREE.Vector3(...layout.floors.repair);
+ const step={from:position.clone(),work:repairWorkPosition(c,2),time:0,duration:3.2};let cancelled=false;
+ for(let i=0;i<180;i++){step.time+=1/60;const frame=advanceRepairMovement(step,position,1/60,guard,c);if(frame.cancelled){cancelled=true;break;}}
+ assert.equal(cancelled,true,'an obstruction cannot keep the repair busy forever');
+ assert.equal(Math.abs(c.hinge.rotation.y),0,'cancelled repair closes and resets the cabinet');
+ guard.refresh();assert.equal(guard.blocker(position),null,'no teleport or movement through the obstruction');
+ const walker=createFloorWalker(layout.surfaces,guard);
+ assert.ok(walker.path(position,new THREE.Vector3(...layout.floors.repair)),'player can walk back to the repair marker');
+ obstacle.visible=false;guard.refresh();step.from.copy(position);step.time=0;
+ for(let i=0;i<240;i++){step.time+=1/60;const frame=advanceRepairMovement(step,position,1/60,guard,c);assert.equal(frame.blocker,null);if(frame.t===1){cancelled=false;break;}}
+ assert.equal(cancelled,false,'a fresh attempt succeeds after the obstruction clears');
+});
