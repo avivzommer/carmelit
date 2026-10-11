@@ -144,3 +144,56 @@ test('mobile roof caps fade with the full roof while aboard and restore after st
  const original=createCarmelitTrain(0);original.updateBoarding(1,'station1',true,0,true);
  assert.ok(original.roofEdges.every(edge=>edge.userData.viewOpacity===undefined),'original level keeps its existing roof treatment');
 });
+
+test('wheel grip accepts broad touches, preserves direction and suppresses hub jitter',async()=>{
+ const {createWheelGrip}=await import('./mobile-interaction.js');
+ const targets=[{id:'wheel',x:100,y:100,radius:84},{id:'cabinet',x:190,y:100,radius:28}];
+ assert.equal(closestTouchTarget({x:100,y:175},targets,()=>true).id,'wheel');
+ assert.equal(closestTouchTarget({x:100,y:185},targets,()=>true),null);
+ assert.equal(closestTouchTarget({x:180,y:100},targets,()=>true).id,'cabinet');
+ assert.equal(closestTouchTarget({x:100,y:175},targets,()=>false),null,'bigger grip cannot reach through a wall');
+ for(const direction of [-1,1]){
+  const grip=createWheelGrip({x:172,y:100},{x:100,y:100});let total;
+  for(let i=1;i<=48;i++)total=grip.move({x:100+72*Math.cos(direction*i*Math.PI/48),y:100+72*Math.sin(direction*i*Math.PI/48)});
+  assert.ok(Math.abs(total-direction*Math.PI)<.01,'large finger arc turns the wheel either way');
+  total=grip.move({x:300,y:300});assert.ok(Number.isFinite(total),'gesture keeps working outside original hit area');
+ }
+ const jitter=createWheelGrip({x:101,y:100},{x:100,y:100});
+ assert.ok(Math.abs(jitter.move({x:99,y:101}))<.01,'crossing hub does not jump half a revolution');
+});
+
+test('nearby floor taps snap to reachable ground without crossing walls, rails or closed gates',()=>{
+ const root=new THREE.Group(),wall=new THREE.Mesh(new THREE.BoxGeometry(.12,1,4));wall.position.set(0,.5,0);root.add(wall);
+ const guard=createWalkGuard([root]),surfaces=[{x:0,y:0,z:0,w:4,d:4,id:'deck'}],walker=createFloorWalker(surfaces,guard);
+ const from=new THREE.Vector3(-1,0,0);
+ const nearWall=walker.nearby(from,new THREE.Vector3(.05,0,0));assert.ok(nearWall);
+ let prior=from;for(const p of nearWall.points){assert.ok(p.x<-.20);assert.equal(guard.segmentBlocker(prior,p),null);assert.ok(walker.supported(prior,p));prior=p;}
+ const edge=walker.nearby(from,new THREE.Vector3(-2.12,0,.6));assert.ok(edge);assert.ok(edge.points.at(-1).x>=-1.85,'edge miss lands inside body clearance');
+ assert.equal(walker.nearby(from,new THREE.Vector3(1,0,0)),null,'cannot select a floor across a sealed wall');
+ assert.equal(walker.nearby(from,new THREE.Vector3(-3,0,0)),null,'distant empty space is silently ignored');
+ const layout=createMechanicLayout(2,{serviceStairX:3.8});layout.updateGates([false,false,false]);
+ const station=createSteppedStation(layout),physical=createWalkGuard([layout.root,station.root]),real=createFloorWalker(layout.surfaces,physical,{waypoints:[...layout.stairPaths.values()].flat()});
+ const result=real.nearby(new THREE.Vector3(...layout.floors.dockNear),new THREE.Vector3(...layout.stairPaths.get('dockNear')[6]));
+ assert.equal(result,null,'miss tolerance does not bypass locked staircase');
+});
+
+test('shadow scheduling caches idle frames and reduces underground refreshes without slowing movement',async()=>{
+ const {createShadowSchedule}=await import('./mobile-performance.js');
+ const schedule=createShadowSchedule();assert.equal(schedule.update(1/60),true);
+ assert.equal(schedule.update(1/60),false,'static scene reuses its shadow map');
+ let underground=0;
+ for(let i=0;i<60;i++)if(schedule.update(1/60,{moving:true,depth:1}))underground++;
+ assert.ok(underground>=10&&underground<=12,`underground shadow refreshes ${underground} per 60 movement frames`);
+ assert.equal(schedule.update(1/60,{moving:true,depth:0}),true,'surface movement refreshes every frame');
+ for(let i=0;i<60;i++)schedule.update(1/60,{depth:0});
+ assert.equal(schedule.update(1/60,{depth:0}),false,'cached after doors and gait settle');
+});
+
+test('underground resolution uses stable thresholds and restores surface detail',async()=>{
+ const {createUndergroundResolution}=await import('./mobile-performance.js');
+ const ratio=createUndergroundResolution(1.5);
+ assert.equal(ratio(0),1.5);assert.equal(ratio(.6),1.5);assert.equal(ratio(.8),1);
+ assert.equal(ratio(.6),1,'no repeated buffer resizing around the entry threshold');
+ assert.equal(ratio(.2),1.5,'surface resolution returns after ascending');
+ assert.equal(createUndergroundResolution(.8)(1),.8,'never upscale low-resolution devices');
+});

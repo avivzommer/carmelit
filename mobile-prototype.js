@@ -1,12 +1,13 @@
-import {closestTouchTarget} from './mobile-interaction.js';
+import {closestTouchTarget,createWheelGrip} from './mobile-interaction.js?touch-tolerance=1';
+import {createShadowSchedule,createUndergroundResolution} from './mobile-performance.js';
 import {createStationWheels,createCabControls,addCabinetWrench,createInteractionHalo,wheelTravel,carriageStep} from './mobile-machinery.js?station-clearance=2';
-import {createFloorWalker} from './mobile-wander.js?free-walk=1';
+import {createFloorWalker} from './mobile-wander.js?touch-tolerance=1';
 import {createRunout,createDepartureRunout,applyDepartureFade} from './mechanic-runout.js';
 import * as THREE from 'three';
 import {createMechanicJourney} from './mechanic-state.mjs?free-walk=1';
 import {createMechanicLayout} from './mechanic-layout.js?station-clearance=2';
 import {createSteppedStation} from './mechanic-station.js?station-clearance=2';
-import {createWalkGuard,createPlayerCutaway,cabinetWorkOffset} from './mechanic-clearance.js?spatial-cache=1';
+import {createWalkGuard,createPlayerCutaway,cabinetWorkOffset} from './mechanic-clearance.js?underground-cache=2';
 import {advanceWalkStep} from './mechanic-walk.js';
 import {createRestoration} from './mechanic-restoration.js';
 import {createTrack,trainPosition,STATION_Y,TERMINAL_Z,LINE_CLIP_PLANES,departureTravel,deckHeightAtZ} from './mechanic-track.js';
@@ -27,10 +28,14 @@ try {
   document.body.append(message);
   throw error;
 }
-renderer.setPixelRatio(Math.min(devicePixelRatio,matchMedia('(pointer:coarse)').matches?1.5:2));
+const phoneRendering=matchMedia('(pointer:coarse)').matches;
+renderer.setPixelRatio(Math.min(devicePixelRatio,phoneRendering?1.5:2));
+const undergroundResolution=createUndergroundResolution(renderer.getPixelRatio());
 renderer.shadowMap.enabled = true;
+renderer.shadowMap.autoUpdate = false;
+const shadowSchedule=createShadowSchedule();
 renderer.localClippingEnabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.type = THREE.PCFShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.18;
@@ -46,7 +51,7 @@ const sunlight = new THREE.DirectionalLight(0xfff0d4, 3.4);
 sunlight.position.set(-7, 20, 12);
 sunlight.target.position.set(0, STATION_Y[1], 0);
 sunlight.castShadow = true;
-sunlight.shadow.mapSize.set(2048, 2048);
+sunlight.shadow.mapSize.setScalar(matchMedia('(pointer:coarse)').matches?1024:2048);
 Object.assign(sunlight.shadow.camera, { left: -8, right: 8, top: 11, bottom: -11, near: 0.1, far: 50 });
 sunlight.shadow.normalBias = 0.025;
 sunlight.shadow.bias = -0.00015;
@@ -170,11 +175,11 @@ const layout=createMechanicLayout(chapter,{box,mesh,serviceStairX:3.8});scene.ad
 const station=chapter===2?createSteppedStation(layout,{wheelWallBays:true}):null;
 if(station)scene.add(station.root);
 const {floors}=layout;
+let shownDepth='';
 const atmosphere=createUndergroundAtmosphere({scene,renderer,ambient,sunlight,fill,passages:layout.passages,
- onChange:(strength,power)=>document.body.style.setProperty('--underground-depth',THREE.MathUtils.lerp(.30*(1-power),1,strength).toFixed(3))});
+ onChange:(strength,power)=>{const value=THREE.MathUtils.lerp(.30*(1-power),1,strength).toFixed(3);if(value!==shownDepth){shownDepth=value;document.body.style.setProperty('--underground-depth',value);}}});
 const reducedMotion=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-let feedbackTimer;
-const say=text=>{status.textContent=text;if(/before|already at|blocked|obstacle|closed|other side|level with/i.test(text)){document.body.classList.add('show-hint');clearTimeout(feedbackTimer);feedbackTimer=setTimeout(()=>document.body.classList.remove('show-hint'),3500);}};
+const say=text=>{status.textContent=text;};
 const introCard=document.createElement('div');introCard.id='intro-guide';introCard.hidden=true;
 introCard.setAttribute('role','dialog');introCard.setAttribute('aria-modal','true');introCard.setAttribute('aria-labelledby','intro-title');
 const introPanel=document.createElement('section'),introCount=document.createElement('div'),introTitle=document.createElement('h1'),introText=document.createElement('p'),introNext=document.createElement('button');
@@ -376,7 +381,7 @@ function nextStep(){
 }
 function depart(){animation={type:'departure',from:travel,to:departureTravel(game.high,chapter),time:0,duration:chapter===2?6:2.1};say(chapter===1?'Line repaired. Departing for the upper line.':'The exit is open. Taking the train through the final tunnel.');}
 function release(index){if(game.release(index))animation={type:'slide',from:travel,to:index,time:0,duration:Math.max(.45,Math.abs(travel-index)*.7)};}
-function reset(){clearTimeout(feedbackTimer);document.body.classList.remove('show-hint');rippleTime=0;tapRipple.visible=false;document.querySelector('#overview').setAttribute('aria-pressed','false');document.querySelector('#overview').setAttribute('aria-label','Overview');document.querySelector('#overview').textContent='◇';cancelActionReveal();introCard.hidden=true;document.querySelector('#controls').inert=false;canvas.style.opacity='1';introFocus=0;departureFocus=0;resize();closeWheel();activeCabDirection=null;repairRequested=false;afterWalk=null;game.reset();animation=null;positions(game.low);person.position.copy(point('entrance'));person.rotation.y=0;desiredHeading=0;settlePose();bodyRig.rotation.x=0;repairTool.visible=false;cabinets.forEach(c=>c.setProgress(0,false));win.hidden=true;document.body.classList.remove('departing','entering');restoration.reset();station?.reset();atmosphere?.reset();layout.updateGates(game.state.pressed);updateBoarding();hint();}
+function reset(){document.body.classList.remove('show-hint');rippleTime=0;tapRipple.visible=false;document.querySelector('#overview').setAttribute('aria-pressed','false');document.querySelector('#overview').setAttribute('aria-label','Overview');document.querySelector('#overview').textContent='◇';cancelActionReveal();introCard.hidden=true;document.querySelector('#controls').inert=false;canvas.style.opacity='1';introFocus=0;departureFocus=0;resize();closeWheel();activeCabDirection=null;repairRequested=false;afterWalk=null;game.reset();animation=null;positions(game.low);person.position.copy(point('entrance'));person.rotation.y=0;desiredHeading=0;settlePose();bodyRig.rotation.x=0;repairTool.visible=false;cabinets.forEach(c=>c.setProgress(0,false));win.hidden=true;document.body.classList.remove('departing','entering');restoration.reset();station?.reset();atmosphere?.reset();layout.updateGates(game.state.pressed);updateBoarding();hint();}
 const raycaster=new THREE.Raycaster(),ndc=new THREE.Vector2();
 function pointerRay(e){const r=canvas.getBoundingClientRect();ndc.set((e.clientX-r.left)/r.width*2-1,1-(e.clientY-r.top)/r.height*2);raycaster.setFromCamera(ndc,camera);scene.updateMatrixWorld(true);}
 function interactiveHit(e){
@@ -403,7 +408,7 @@ function requestWalk(id,repair=false,done=null){
  walk(id);
 }
 function startWander(to,zone=null,done=afterWalk){
- const points=floorWalker.path(person.position,to);if(!points){say('That spot is blocked or outside the walking path.');return;}
+ const points=floorWalker.path(person.position,to);if(!points){afterWalk=null;repairRequested=false;return;}
  afterWalk=done;game.state.motion={type:'wander'};animation={type:'wander',points,zone};nextWander();
 }
 function nextWander(){
@@ -415,17 +420,20 @@ function exploreFloor(to,zone){
  cancelWander();if(game.state.motion||game.state.location.startsWith('car'))return;
  closeWheel();repairRequested=false;afterWalk=null;
  to.y=layout.surfaces.reduce((best,s)=>Math.abs(s.y-to.y)<Math.abs(best-to.y)?s.y:best,layout.surfaces[0].y);
- startWander(to,zone);
+ const nearby=floorWalker.nearby(person.position,to);
+ if(!nearby)return;
+ tapRipple.position.copy(nearby.points.at(-1)).add(new THREE.Vector3(0,.035,0));tapRipple.visible=true;rippleTime=.65;
+ afterWalk=null;game.state.motion={type:'wander'};animation={type:'wander',points:nearby.points,zone:nearby.zone??zone};nextWander();
 }
 function touchTargets(){
  const targets=[],location=game.state.location,aboard=location.startsWith('car');
- const add=(world,action,owner)=>{const p=world.clone().project(camera);if(p.z>=-1&&p.z<=1)targets.push({x:(p.x+1)*canvas.clientWidth/2,y:(1-p.y)*canvas.clientHeight/2,world,action,owner});};
+ const add=(world,action,owner,radius=28)=>{const p=world.clone().project(camera);if(p.z>=-1&&p.z<=1)targets.push({x:(p.x+1)*canvas.clientWidth/2,y:(1-p.y)*canvas.clientHeight/2,world,action,owner,radius});};
  if(aboard){
   const i=location==='carB'?1:0;
   cabControls[i].controls.forEach(c=>add(c.root.localToWorld(new THREE.Vector3(0,.26,0)),{up:c.up},c.root));
  }else{
   cabinets.forEach((c,i)=>{const same=i===0?['entrance','station1'].includes(location):i===1?location.startsWith('station2'):location==='repair';if(same&&!game.state.pressed[i])add(c.root.localToWorld(new THREE.Vector3(0,.32,.18)),{repair:repairIds[i]},c.root);});
-  platformWheels.forEach((w,i)=>{if(w.id===(location==='entrance'?'station1':location))add(w.rotor.getWorldPosition(new THREE.Vector3()),{wheel:i},w.root);});
+  platformWheels.forEach((w,i)=>{if(w.id===(location==='entrance'?'station1':location))add(w.rotor.getWorldPosition(new THREE.Vector3()),{wheel:i},w.root,i===activeWheel?84:48);});
  }
  trainModels.forEach((train,i)=>{const id=i?'carB':'carA',landing=game.landingFor(id);if(!landing||aboard&&location!==id)return;const door=train.doors.find(d=>d.side===train.boarding.side);if(door)add(train.root.localToWorld(new THREE.Vector3(door.side*.93,.07,0)),{destination:aboard?landing:id},train.root);});
  return targets;
@@ -441,28 +449,55 @@ function targetVisible(target){
  return false;
 }
 function inputHit(e){
+ // While holding a wheel, its grip area includes the surrounding floor and
+ // carriage silhouette. Capture the finger until release, even far from the rim.
+ if(activeWheel!==null){
+  const wheel=touchTargets().find(t=>t.action.wheel===activeWheel);
+  if(wheel&&Math.hypot(e.clientX-wheel.x,e.clientY-wheel.y)<=wheel.radius&&targetVisible(wheel))return wheel.action;
+ }
  const exact=interactiveHit(e);
  if(exact&&!exact.floor)return exact;
  const nearby=closestTouchTarget({x:e.clientX,y:e.clientY},touchTargets(),targetVisible);
- return nearby?.action||exact;
+ return nearby?.action||exact||nearbyFloor(e);
+}
+function nearbyFloor(e){
+ pointerRay(e);
+ const candidates=[],seen=new Set(),passage=cutaway.activePassage;
+ for(const surface of layout.surfaces){
+  if(passage==='service'&&!/^(repair|stairs:|dock)/.test(surface.id)||passage==='rear'&&surface.id!=='upperPassage')continue;
+  const hit=raycaster.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0,1,0),-surface.y),new THREE.Vector3());
+  if(!hit)continue;
+  const world=new THREE.Vector3(THREE.MathUtils.clamp(hit.x,surface.x-surface.w/2+.16,surface.x+surface.w/2-.16),surface.y+.018,THREE.MathUtils.clamp(hit.z,surface.z-surface.d/2+.004,surface.z+surface.d/2-.004));
+  const screen=world.clone().project(camera),x=(screen.x+1)*canvas.clientWidth/2,y=(1-screen.y)*canvas.clientHeight/2,distance=Math.hypot(e.clientX-x,e.clientY-y);
+  const key=world.toArray().map(n=>n.toFixed(3)).join(',');if(distance<=44&&!seen.has(key)){seen.add(key);candidates.push({world,distance,zone:surface.id});}
+ }
+ candidates.sort((a,b)=>a.distance-b.distance);
+ for(const candidate of candidates){
+  const p=candidate.world.clone().project(camera);raycaster.setFromCamera(new THREE.Vector2(p.x,p.y),camera);
+  const hit=raycaster.intersectObjects(scene.children,true).find(h=>{
+   if(!h.object.isMesh||h.object.userData.visualEffect||h.object.userData.cutawayOpacity<.35)return false;
+   for(let o=h.object;o;o=o.parent)if(o===person||!o.visible)return false;return true;
+  });
+  if(hit?.face?.normal.y>.8&&hit.point.distanceTo(candidate.world)<.12)return {floor:candidate.world,zone:candidate.zone};
+ }
+ return null;
 }
 let tapStart=null;
 canvas.addEventListener('pointerdown',e=>{
  if(game.state.motion&&game.state.motion.type!=='wander'||overview)return;
- const h=inputHit(e);
+ const h=activeWheel!==null?inputHit(e):null;
  if(activeWheel!==null&&h?.wheel===activeWheel){
-  if(!beginWheel())return;e.preventDefault();wheelGesture={id:e.pointerId,last:wheelAngle(e),total:0,start:travel};canvas.setPointerCapture(e.pointerId);tapStart=null;
+  if(!beginWheel())return;e.preventDefault();wheelGesture={id:e.pointerId,grip:createWheelGrip({x:e.clientX,y:e.clientY},wheelCenter()),start:travel};canvas.setPointerCapture(e.pointerId);tapStart=null;
  }else tapStart={x:e.clientX,y:e.clientY,id:e.pointerId};
 });
 canvas.addEventListener('pointermove',e=>{
  if(!wheelGesture||e.pointerId!==wheelGesture.id)return;
- const angle=wheelAngle(e),delta=Math.atan2(Math.sin(angle-wheelGesture.last),Math.cos(angle-wheelGesture.last));
- wheelGesture.total+=delta;wheelGesture.last=angle;animation.target=wheelTravel(wheelGesture.start,wheelGesture.total,platformWheels[activeWheel].car);
+ e.preventDefault();const total=wheelGesture.grip.move({x:e.clientX,y:e.clientY});animation.target=wheelTravel(wheelGesture.start,total,platformWheels[activeWheel].car);
 });
 canvas.addEventListener('pointerup',e=>{
  if(wheelGesture?.id===e.pointerId){finishWheel();return;}
  if(!tapStart||tapStart.id!==e.pointerId)return;const start=tapStart;tapStart=null;if(Math.hypot(e.clientX-start.x,e.clientY-start.y)>12)return;
- const h=inputHit(e);if(h?.wheel!==undefined)selectWheel(h.wheel);else if(h?.up!==undefined)driveCab(h.up);else if(h?.repair)requestWalk(h.repair,true);else if(h?.floor){if(game.state.location.startsWith('car')){const landing=game.landingFor(game.state.location);if(landing&&h.zone===landing)requestWalk(landing);}else{tapRipple.position.copy(h.floor).add(new THREE.Vector3(0,.035,0));tapRipple.visible=true;rippleTime=.65;exploreFloor(h.floor.clone(),h.zone);}}else if(h?.destination)requestWalk(h.destination);
+ const h=inputHit(e);if(h?.wheel!==undefined)selectWheel(h.wheel);else if(h?.up!==undefined)driveCab(h.up);else if(h?.repair)requestWalk(h.repair,true);else if(h?.floor){if(game.state.location.startsWith('car')){const landing=game.landingFor(game.state.location);if(landing&&h.zone===landing)requestWalk(landing);}else{exploreFloor(h.floor.clone(),h.zone);}}else if(h?.destination)requestWalk(h.destination);
 });
 canvas.addEventListener('pointercancel',()=>{tapStart=null;finishWheel();});
 canvas.addEventListener('lostpointercapture',()=>{if(wheelGesture)finishWheel();});
@@ -512,7 +547,7 @@ function beginWheel(){
  if(!game.beginDrag())return false;
  animation={type:'wheelDrive',time:0,duration:Infinity,target:travel,released:false};return true;
 }
-function wheelAngle(e){const w=platformWheels[activeWheel],p=w.rotor.getWorldPosition(new THREE.Vector3()).project(camera);return Math.atan2(e.clientY-(1-p.y)*canvas.clientHeight/2,e.clientX-(p.x+1)*canvas.clientWidth/2);}
+function wheelCenter(){const p=platformWheels[activeWheel].rotor.getWorldPosition(new THREE.Vector3()).project(camera);return {x:(p.x+1)*canvas.clientWidth/2,y:(1-p.y)*canvas.clientHeight/2};}
 function finishWheel(){if(animation?.type==='wheelDrive')animation.released=true;wheelGesture=null;}
 document.querySelector('#overview').onclick=()=>{if(game.state.motion?.type==='wheelDrive')return;overview=!overview;closeWheel();document.querySelector('#overview').setAttribute('aria-pressed',String(overview));document.querySelector('#overview').textContent=overview?'⌖':'◇';document.querySelector('#overview').setAttribute('aria-label',overview?'Back to player':'Overview');resize();};
 const progressDots=[...document.querySelectorAll('#repair-progress span')];let shownProgress='',shownBusy=null;
@@ -620,6 +655,8 @@ function animate(){
 
  scene.updateMatrixWorld(true);cutaway.update(camera,person.position,dt,{surfaceReveal});
  updateMobileJourney(dt);
+ if(phoneRendering){const ratio=undergroundResolution(undergroundStrength);if(ratio!==renderer.getPixelRatio())renderer.setPixelRatio(ratio);}
+ renderer.shadowMap.needsUpdate=shadowSchedule.update(dt,{moving:Boolean(animation)||walked,depth:undergroundStrength});
  renderer.render(scene,camera);
 }
 animate();

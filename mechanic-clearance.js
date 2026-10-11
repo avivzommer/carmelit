@@ -59,32 +59,34 @@ export function createPlayerCutaway(roots,{passages=[]}={}){
  const candidates=[],ray=new THREE.Raycaster(),clones=new Map(),hits=[];
  let active=null,strength=0;
  function inherited(mesh,key){for(let p=mesh;p;p=p.parent)if(p.userData[key]!==undefined)return p.userData[key];}
- for(const root of roots)root.traverse(mesh=>{if(mesh.isMesh&&!inherited(mesh,'alwaysVisible')){const cast=THREE.Mesh.prototype.raycast;candidates.push({mesh,cast,fade:1,materials:null,shadow:mesh.castShadow,bounds:new THREE.Box3(),matrix:null});}});
+ for(const root of roots)root.traverse(mesh=>{if(mesh.isMesh&&!inherited(mesh,'alwaysVisible')){const cast=THREE.Mesh.prototype.raycast;candidates.push({mesh,cast,fade:1,materials:null,shadow:mesh.castShadow,bounds:new THREE.Box3(),matrix:null,layer:inherited(mesh,'focusLayer'),roof:inherited(mesh,'occupancyRoof'),protected:inherited(mesh,'cutawayProtected')});}});
  function update(camera,feet,dt,{surfaceReveal=0}={}){
   const passage=passageAt(feet,passages);
   if(passage)active=passage;
-  strength=THREE.MathUtils.damp(strength,passage?1-surfaceReveal:0,12,dt);
+  const targetStrength=passage?1-surfaceReveal:0;
+  strength=THREE.MathUtils.damp(strength,targetStrength,12,dt);
+  if(Math.abs(strength-targetStrength)<.0001)strength=targetStrength;
   if(strength<.001&&!passage){strength=0;active=null;}
   const head=feet.clone().add(new THREE.Vector3(0,.55,0)),direction=new THREE.Vector3();camera.getWorldDirection(direction);
   ray.set(head.clone().addScaledVector(direction,-40),direction);ray.far=39.8;
   for(const item of candidates){
    const {mesh,cast}=item;let visible=true;for(let p=mesh;p;p=p.parent)if(!p.visible){visible=false;break;}
-   const protectedPassage=active&&inherited(mesh,'focusLayer')===active.id;
-   const roof=inherited(mesh,'occupancyRoof');hits.length=0;
+   const protectedPassage=active&&item.layer===active.id;
+   hits.length=0;
    if(!item.matrix?.equals(mesh.matrixWorld)){
     if(!mesh.geometry.boundingBox)mesh.geometry.computeBoundingBox();
     item.bounds.copy(mesh.geometry.boundingBox).applyMatrix4(mesh.matrixWorld);(item.matrix??=new THREE.Matrix4()).copy(mesh.matrixWorld);
    }
-   if(visible&&!protectedPassage&&!roof&&!inherited(mesh,'cutawayProtected')&&ray.ray.intersectsBox(item.bounds))cast.call(mesh,ray,hits);
-   let target=protectedPassage?1:hits.length?.18:1;
-   if(active&&!protectedPassage){
-    if(item.bounds.max.y>active.floor+.10)target=Math.min(target,THREE.MathUtils.lerp(1,.09,strength));
-   }
+   const upperFade=active&&!protectedPassage&&item.bounds.max.y>active.floor+.10?THREE.MathUtils.lerp(1,.09,strength):1;
+   // Once the entire upper level is ghosted, individual occlusion rays cannot
+   // change its fade. Only the active passage needs detailed visibility work.
+   if(upperFade>.18&&visible&&!protectedPassage&&!item.roof&&!item.protected&&ray.ray.intersectsBox(item.bounds))cast.call(mesh,ray,hits);
+   let target=Math.min(protectedPassage?1:hits.length?.18:1,upperFade);
    target*=inherited(mesh,'viewOpacity')??1;
-   if(inherited(mesh,'cutawayProtected'))target=1;
+   if(item.protected)target=1;
    const fade=THREE.MathUtils.damp(item.fade,target,14,dt);
-   const settled=fade>.999?1:fade;
-   if(settled===1&&item.fade===1)continue;item.fade=settled;mesh.userData.cutawayOpacity=settled;
+   const settled=Math.abs(fade-target)<.0001?target:fade;
+   if(settled===item.fade)continue;item.fade=settled;mesh.userData.cutawayOpacity=settled;
    // Transparent roofs and the hidden upper floor must not cast opaque shadows
    // across the passage that is currently being played.
    mesh.castShadow=item.shadow&&settled>.95;

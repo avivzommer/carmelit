@@ -318,3 +318,15 @@ test('cutaway broad phase skips distant meshes and updates when an obstruction m
   assert.equal(calls,60);assert.ok(root.children[0].material.opacity<.25,'moving blockers still reveal the player');
  }finally{THREE.Mesh.prototype.raycast=original;}
 });
+
+test('settled underground cutaways reuse opacity without repeated material writes',()=>{
+ const root=new THREE.Group(),wall=new THREE.Mesh(new THREE.BoxGeometry(2,2,.1),new THREE.MeshStandardMaterial());root.add(wall);root.updateMatrixWorld(true);
+ const camera=new THREE.PerspectiveCamera();camera.position.set(4,6,5);camera.lookAt(0,0,0);camera.updateMatrixWorld(true);
+ const passage={id:'test',entryHeight:1,floor:-1,points:[[-1,-1,0],[1,-1,0]]};
+ const cutaway=createPlayerCutaway([root],{passages:[passage]}),feet=new THREE.Vector3(0,-1,0);
+ for(let i=0;i<120;i++)cutaway.update(camera,feet,1/60);
+ let writes=0,value=wall.material.opacity;Object.defineProperty(wall.material,'opacity',{get:()=>value,set:v=>{value=v;writes++;},configurable:true});
+ for(let i=0;i<120;i++)cutaway.update(camera,feet,1/60);
+ assert.equal(writes,0,'station ghost materials do not need updating after their fade settles');
+ assert.equal(value,.09);cutaway.update(camera,new THREE.Vector3(4,1,0),1/60);assert.ok(writes>0,'ascending resumes the fade');
+});
