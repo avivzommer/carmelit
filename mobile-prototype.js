@@ -1,3 +1,4 @@
+import {createIntroHints} from './intro-hints.js';
 import {closestTouchTarget,createWheelGrip,resolveTouchHit,gestureDistance,cabinSwipe} from './mobile-interaction.js?swipe-stairs=1';
 import {createShadowSchedule,createUndergroundResolution} from './mobile-performance.js';
 import {repairWorkPosition,advanceRepairMovement} from './mobile-repair.js';
@@ -184,10 +185,11 @@ const say=text=>{status.textContent=text;};
 const introCard=document.createElement('div');introCard.id='intro-guide';introCard.hidden=true;
 introCard.setAttribute('role','dialog');introCard.setAttribute('aria-modal','true');introCard.setAttribute('aria-labelledby','intro-title');
 const introPanel=document.createElement('section'),introCount=document.createElement('div'),introTitle=document.createElement('h1'),introText=document.createElement('p'),introNext=document.createElement('button');
-introCount.className='intro-progress';introCount.setAttribute('role','progressbar');introCount.setAttribute('aria-label','Introduction progress');introCount.setAttribute('aria-valuemin','0');introCount.setAttribute('aria-valuemax','3');
+introCount.className='intro-progress';introCount.setAttribute('role','progressbar');introCount.setAttribute('aria-label','Introduction progress');introCount.setAttribute('aria-valuemin','0');introCount.setAttribute('aria-valuemax','1');
 const introBrand=document.createElement('span');introBrand.className='dialog-brand';introBrand.textContent='Carmelit / Technician shift';
-introTitle.id='intro-title';introNext.type='button';introPanel.append(introBrand,introCount,introTitle,introText,introNext);introCard.append(introPanel);document.body.append(introCard);
-const introPages=[['Bring the line back to life','Tap a floor or stair to choose where to walk. Tap again to change direction or turn back. Repairs happen only when you tap a blue cabinet with a wrench. You can board an open cart before fixing the power, but it will not move yet. Use the yellow wheel on the upper left platform to call the second cart. Inside a cart, swipe up or down to ride, or tap its arrow controls. Restore all three cabinets to open the exit.']];
+const introHints=createIntroHints({mobile:true});
+introTitle.id='intro-title';introNext.type='button';introPanel.append(introBrand,introCount,introTitle,introText,introHints,introNext);introCard.append(introPanel);document.body.append(introCard);
+const introPages=[['Power up the line','Fix 3 cabinets to open the exit.']];
 let introPage=0;
 let actionRevealTimer;
 function cancelActionReveal(){clearTimeout(actionRevealTimer);}
@@ -229,7 +231,7 @@ function showIntroPage(){
  introCount.setAttribute('aria-valuetext',`Step ${introPage+1} of ${introPages.length}`);
  [introTitle.textContent,introText.textContent]=introPages[introPage];
  introNext.textContent=introPage===introPages.length-1?'Start the game':'Continue';
- revealReadingScreen(introCard,[introTitle,introText],[introNext]);
+ revealReadingScreen(introCard,[introTitle,introText,introHints],[introNext]);
 }
 introNext.onclick=async()=>{
  if(introPage<introPages.length-1){introPage++;showIntroPage();}

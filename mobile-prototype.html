@@ -24,7 +24,7 @@
     #win p { margin: 0 0 28px; opacity: .85; }
     @media (prefers-reduced-motion: reduce) { #win { backdrop-filter: none; } }
   </style>
-  <link rel="stylesheet" href="./game-layout.css?cartridge-ui=1">
+  <link rel="stylesheet" href="./game-layout.css?icon-intro=1">
   <script type="importmap">{"imports":{"three":"./vendor/three.module.js"}}</script>
 <link rel="stylesheet" href="./mobile-prototype.css">
 </head>
@@ -34,6 +34,6 @@
   <div id="controls"><button id="overview" aria-label="Overview" aria-pressed="false">◇</button><button id="help">Hint</button> <button id="restart" aria-label="Restart" title="Restart (R)">↻</button></div>
   <p id="status" role="status" aria-live="polite"></p>
   <div id="win" hidden role="dialog" aria-modal="true" aria-labelledby="win-title"><section class="station-dialog"><span class="dialog-brand">Carmelit / Line restored</span><h1 id="win-title">Level complete.</h1><p>Power restored. The line is running again.</p><button id="again">Play again</button><a class="level-link" href="./index.html">Return to station</a></section></div>
-<script type="module" src="./mobile-prototype.js?cartridge-ui=1"></script>
+<script type="module" src="./mobile-prototype.js?icon-intro=1"></script>
 </body>
 </html>

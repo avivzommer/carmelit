@@ -1,3 +1,4 @@
+import {createIntroHints} from './intro-hints.js';
 import {createRunout,createDepartureRunout,applyDepartureFade} from './mechanic-runout.js';
 import * as THREE from 'three';
 import {createMechanicJourney} from './mechanic-state.mjs';
@@ -174,14 +175,11 @@ const say=text=>status.textContent=text;
 const introCard=document.createElement('div');introCard.id='intro-guide';introCard.hidden=true;
 introCard.setAttribute('role','dialog');introCard.setAttribute('aria-modal','true');introCard.setAttribute('aria-labelledby','intro-title');
 const introPanel=document.createElement('section'),introCount=document.createElement('div'),introTitle=document.createElement('h1'),introText=document.createElement('p'),introNext=document.createElement('button');
-introCount.className='intro-progress';introCount.setAttribute('role','progressbar');introCount.setAttribute('aria-label','Introduction progress');introCount.setAttribute('aria-valuemin','0');introCount.setAttribute('aria-valuemax','3');
+introCount.className='intro-progress';introCount.setAttribute('role','progressbar');introCount.setAttribute('aria-label','Introduction progress');introCount.setAttribute('aria-valuemin','0');introCount.setAttribute('aria-valuemax','1');
 const introBrand=document.createElement('span');introBrand.className='dialog-brand';introBrand.textContent='Carmelit / Technician shift';
-introTitle.id='intro-title';introNext.type='button';introPanel.append(introBrand,introCount,introTitle,introText,introNext);introCard.append(introPanel);document.body.append(introCard);
-const introPages=[
- ['Your shift begins','The station has lost power. You are the technician sent to restore its three repair stations and bring the line back to life.'],
- ['Make your first repair','Tap the triangle beside the blue cabinet. The technician will walk over and fix it. Tap accessible paths and platforms to move around.'],
- ['Bring the line back to life','Board through an open train door, then drag the train along the rails. Explore the underground passages and repair the remaining cabinets to light up the exit.']
-];
+const introHints=createIntroHints({mobile:false});
+introTitle.id='intro-title';introNext.type='button';introPanel.append(introBrand,introCount,introTitle,introText,introHints,introNext);introCard.append(introPanel);document.body.append(introCard);
+const introPages=[['Power up the line','Make 3 repairs to open the exit.']];
 let introPage=0;
 let actionRevealTimer;
 function cancelActionReveal(){clearTimeout(actionRevealTimer);}
@@ -223,7 +221,7 @@ function showIntroPage(){
  introCount.setAttribute('aria-valuetext',`Step ${introPage+1} of ${introPages.length}`);
  [introTitle.textContent,introText.textContent]=introPages[introPage];
  introNext.textContent=introPage===introPages.length-1?'Start the game':'Continue';
- revealReadingScreen(introCard,[introTitle,introText],[introNext]);
+ revealReadingScreen(introCard,[introTitle,introText,introHints],[introNext]);
 }
 introNext.onclick=async()=>{
  if(introPage<introPages.length-1){introPage++;showIntroPage();}
