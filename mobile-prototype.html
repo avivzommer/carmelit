@@ -26,14 +26,26 @@
   </style>
   <link rel="stylesheet" href="./game-layout.css?icon-intro=1">
   <script type="importmap">{"imports":{"three":"./vendor/three.module.js"}}</script>
-<link rel="stylesheet" href="./mobile-prototype.css?pixel-hud=1">
+<link rel="stylesheet" href="./mobile-prototype.css?station-hud=1">
 </head>
 <body data-chapter="2">
   <canvas id="scene" aria-label="Mobile station level. Tap floors to explore, repair cabinets, turn the upper left wheel, and swipe up or down inside a cart or use cabin controls. Overview shows the station. Restart repeats the journey."></canvas>
-  <div id="repair-progress" aria-label="Repair progress"><span aria-label="Repair 1: pending"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 2h4v4h2v4h2v4h2v4h2v4H2v-4h2v-4h2v-4h2V6h2z"/></svg></span><span aria-label="Repair 2: pending"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v16H4z"/></svg></span><span aria-label="Repair 3: pending"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 2h8v2h4v4h2v8h-2v4h-4v2H8v-2H4v-4H2V8h2V4h4z"/></svg></span></div>
-  <div id="controls"><button id="overview" aria-label="Overview" aria-pressed="false" title="Overview"><svg class="overview-icon" viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" d="M10 2h4v2h2v2h2v2h2v2h2v4h-2v2h-2v2h-2v2h-2v2h-4v-2H8v-2H6v-2H4v-2H2v-4h2V8h2V6h2V4h2zM10 6h4v2h2v2h2v4h-2v2h-2v2h-4v-2H8v-2H6v-4h2V8h2z"/></svg><svg class="focus-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 2h7v3H5v4H2zm13 0h7v7h-3V5h-4zM2 15h3v4h4v3H2zm17 0h3v7h-7v-3h4zM10 9h4v6h-4z"/></svg></button><button id="help">Hint</button> <button id="restart" aria-label="Restart" title="Restart (R)"><svg viewBox="0 0 26 26" aria-hidden="true"><path d="M8 3h9V0h3v3h3v3h3v3h-3v3h-3v3h-3V8H8v3H5v9h3v3h10v-3h3v-6h4v8h-3v3H7v-2H3v-3H1V10h3V6h4z"/></svg></button></div>
+  <div id="repair-progress" aria-label="Repair progress">
+    <span aria-label="Repair 1: pending"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 22 21H2Z"/></svg></span>
+    <span aria-label="Repair 2: pending"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="1"/></svg></span>
+    <span aria-label="Repair 3: pending"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/></svg></span>
+  </div>
+  <div id="controls">
+    <button id="overview" aria-label="Overview" aria-pressed="false" title="Overview">
+      <svg class="overview-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/></svg>
+      <svg class="focus-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8h5V3m13 5h-5V3M8 21v-5H3m13 5v-5h5"/></svg>
+      <span class="overview-icon">Overview</span><span class="focus-icon">Back</span>
+    </button>
+    <button id="help">Hint</button>
+    <button id="restart" aria-label="Restart" title="Restart (R)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 10a8 8 0 1 0-1.8 7.2M20 4v6h-6"/></svg><span>Restart</span></button>
+  </div>
   <p id="status" role="status" aria-live="polite"></p>
   <div id="win" hidden role="dialog" aria-modal="true" aria-labelledby="win-title"><section class="station-dialog"><span class="dialog-brand">Carmelit / Line restored</span><h1 id="win-title">Level complete.</h1><p>Power restored. The line is running again.</p><button id="again">Play again</button><a class="level-link" href="./index.html">Return to station</a></section></div>
-<script type="module" src="./mobile-prototype.js?pixel-hud=1"></script>
+<script type="module" src="./mobile-prototype.js?station-hud=1"></script>
 </body>
 </html>
