@@ -1,4 +1,4 @@
-import {createTutorialProgress,createTutorialCoach} from './mobile-tutorial.js';
+import {createTutorialProgress,createTutorialCoach} from './mobile-tutorial.js?focused-tips=1';
 import {closestTouchTarget,createWheelGrip,resolveTouchHit,gestureDistance,cabinSwipe} from './mobile-interaction.js?swipe-stairs=1';
 import {createShadowSchedule,createUndergroundResolution} from './mobile-performance.js';
 import {repairWorkPosition,advanceRepairMovement} from './mobile-repair.js';
@@ -183,7 +183,7 @@ const atmosphere=createUndergroundAtmosphere({scene,renderer,ambient,sunlight,fi
 const reducedMotion=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const say=text=>{status.textContent=text;};
 const tutorialProgress=createTutorialProgress();
-const tutorialCoach=createTutorialCoach({onDismiss:()=>tutorialProgress.hide(),reducedMotion});
+const tutorialCoach=createTutorialCoach({reducedMotion});
 const introCard=document.createElement('div');introCard.id='intro-guide';introCard.hidden=true;
 introCard.setAttribute('role','dialog');introCard.setAttribute('aria-modal','true');introCard.setAttribute('aria-labelledby','intro-title');
 const introPanel=document.createElement('section'),introTitle=document.createElement('h1'),introText=document.createElement('p'),introNext=document.createElement('button');

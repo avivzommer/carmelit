@@ -14,8 +14,8 @@ test('first repair, boarding and both uphill stops advance only after actual gam
  game.finishRepair();assert.equal(view(tutorial,game).id,'first-board');
  game.walk('carB');assert.equal(view(tutorial,game),null);game.finishWalk();assert.equal(view(tutorial,game).id,'first-ride');
  game.beginDrag();game.release(1);assert.equal(view(tutorial,game),null);game.finishSlide();assert.equal(view(tutorial,game).id,'ride-again');
- game.beginDrag();game.release(0);game.finishSlide();assert.equal(view(tutorial,game).id,'first-lesson-done');
- assert.equal(view(tutorial,game,{},3).id,'first-lesson-done');assert.equal(view(tutorial,game),null);
+ game.beginDrag();game.release(0);game.finishSlide();assert.equal(view(tutorial,game),null,'the uphill lesson ends without a step-off prompt');
+ assert.equal(view(tutorial,game,{},3),null);
 });
 test('boarding before power repair and wrong-way rides remain possible without skipping the lesson',()=>{
  const game=createMechanicJourney(2,{autoRepair:false}),tutorial=createTutorialProgress();
@@ -32,20 +32,32 @@ test('wheel instructions wait for proximity, distinguish taking hold from turnin
  assert.equal(view(tutorial,game,{holdingWheel:true}).id,'wheel-turn');
  game.beginDrag();assert.equal(view(tutorial,game,{holdingWheel:true}),null);
  game.release(1);game.finishSlide();assert.equal(view(tutorial,game,{holdingWheel:true}).id,'wheel-turn','wrong or partial turns can be corrected');
- game.beginDrag();game.release(2);game.finishSlide();assert.equal(view(tutorial,game,{nearWheel:true}).id,'wheel-arrived');
+ game.beginDrag();game.release(2);game.finishSlide();assert.equal(view(tutorial,game,{nearWheel:true}),null,'no boarding follow-up after calling the cart');
  game.walk('carA');game.finishWalk();assert.equal(view(tutorial,game),null);
  game.walk('station2Far');game.finishWalk();assert.equal(view(tutorial,game,{nearWheel:true}),null,'completed wheel lesson does not nag on return');
 });
 test('a cart already waiting at the wheel platform needs no needless wheel turn',()=>{
  const game=createMechanicJourney(2,{autoRepair:false}),tutorial=createTutorialProgress();arrive(tutorial,game);
  game.state.location='station2Far';game.state.stop=2;
- assert.equal(view(tutorial,game,{nearWheel:true}).id,'wheel-arrived');
+ assert.equal(view(tutorial,game,{nearWheel:true}),null,'no boarding follow-up after calling the cart');
 });
 test('hiding tips, restoring contextual help, restarting and overview never mutate puzzle state',()=>{
  const game=createMechanicJourney(2,{autoRepair:false}),tutorial=createTutorialProgress();const initial=JSON.stringify(game.state);
  view(tutorial,game);tutorial.hide();assert.equal(view(tutorial,game),null);tutorial.show();assert.equal(view(tutorial,game).id,'first-fix');
  assert.equal(view(tutorial,game,{overview:true}),null);assert.equal(JSON.stringify(game.state),initial);
- arrive(tutorial,game);tutorial.show();assert.equal(view(tutorial,game).id,'help-service');
+ arrive(tutorial,game);tutorial.show();assert.equal(view(tutorial,game),null,'Tips does not add instructions for the later repairs');
  game.state.complete=true;assert.equal(view(tutorial,game),null);
  game.reset();tutorial.reset();assert.equal(view(tutorial,game).id,'first-fix');
+});
+
+test('later exploration stays unguided, including when Tips is enabled again',()=>{
+ const game=createMechanicJourney(2,{autoRepair:false}),tutorial=createTutorialProgress();arrive(tutorial,game);
+ game.state.location='station2Far';assert.equal(view(tutorial,game,{nearWheel:true}).id,'wheel-hold');
+ game.state.stop=game.low;assert.equal(view(tutorial,game,{nearWheel:true}),null);
+ for(const location of ['station2Far','dockFar','service','dockNear','carB']){
+  for(const pressed of [[true,true,false],[true,true,true]]){
+   game.state.location=location;game.state.pressed=pressed;game.state.stop=game.high;
+   tutorial.hide();tutorial.show();assert.equal(view(tutorial,game,{nearWheel:location==='station2Far'}),null);
+  }
+ }
 });
