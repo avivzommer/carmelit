@@ -10,9 +10,9 @@ Validate gameplay: `node --test visual-study/mechanic*.test.mjs` from the parent
 
 ## Mobile prototype
 
-`mobile-prototype.html` keeps a close camera with tap-to-walk exploration. Floor and stair taps stop at the chosen point and can redirect an ongoing walk. Boarding does not require or trigger a repair; power is still required to move a cart. Tap the three blue cabinets to repair them, approach and turn the physical platform handwheels to call the cable-linked carts, then tap an open doorway to board and use the cabin arrow controls. The middle service stairs sit at the outer platform edges, clear of the trains. Gameplay has no floating text buttons or separate wheel panel. Wheel travel reverses the two carts and settles at a platform stop when released. The original level is unchanged.
+`mobile-prototype.html` keeps a close camera with tap-to-walk exploration. Floor and stair taps stop at the chosen point and can redirect an ongoing walk. Boarding does not require or trigger a repair; power is still required to move a cart. Tap the three blue cabinets to repair them, turn the upper-left platform handwheel to call the second cart, then tap an open doorway to board and swipe up/down inside a cart or use its cabin arrow controls. The middle service stairs sit at the outer platform edges, clear of the trains. Gameplay actions stay on the world objects. Short, optional guidance highlights the first repair, open door, and uphill swipe, then teaches the wheel only when the mechanic approaches it. Tips restores contextual guidance; the close control hides it. Guidance observes progress without changing routes, locks, or input targets. Wheel travel reverses the two carts and settles at a platform stop when released. The original level is unchanged.
 
-Validate the mobile machinery and walking clearance with `node --test visual-study/mobile-machinery.test.mjs` from the parent directory.
+Validate the mobile machinery and walking clearance with `node --test visual-study/mobile-machinery.test.mjs visual-study/mobile-tutorial.test.mjs` from the parent directory.
 
 ## Hosting
 

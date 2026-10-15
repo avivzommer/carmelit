@@ -1,4 +1,4 @@
-import {createIntroHints} from './intro-hints.js';
+import {createTutorialProgress,createTutorialCoach} from './mobile-tutorial.js';
 import {closestTouchTarget,createWheelGrip,resolveTouchHit,gestureDistance,cabinSwipe} from './mobile-interaction.js?swipe-stairs=1';
 import {createShadowSchedule,createUndergroundResolution} from './mobile-performance.js';
 import {repairWorkPosition,advanceRepairMovement} from './mobile-repair.js';
@@ -182,15 +182,13 @@ const atmosphere=createUndergroundAtmosphere({scene,renderer,ambient,sunlight,fi
  onChange:(strength,power)=>{const value=THREE.MathUtils.lerp(.30*(1-power),1,strength).toFixed(3);if(value!==shownDepth){shownDepth=value;document.body.style.setProperty('--underground-depth',value);}}});
 const reducedMotion=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const say=text=>{status.textContent=text;};
+const tutorialProgress=createTutorialProgress();
+const tutorialCoach=createTutorialCoach({onDismiss:()=>tutorialProgress.hide(),reducedMotion});
 const introCard=document.createElement('div');introCard.id='intro-guide';introCard.hidden=true;
 introCard.setAttribute('role','dialog');introCard.setAttribute('aria-modal','true');introCard.setAttribute('aria-labelledby','intro-title');
-const introPanel=document.createElement('section'),introCount=document.createElement('div'),introTitle=document.createElement('h1'),introText=document.createElement('p'),introNext=document.createElement('button');
-introCount.className='intro-progress';introCount.setAttribute('role','progressbar');introCount.setAttribute('aria-label','Introduction progress');introCount.setAttribute('aria-valuemin','0');introCount.setAttribute('aria-valuemax','1');
+const introPanel=document.createElement('section'),introTitle=document.createElement('h1'),introText=document.createElement('p'),introNext=document.createElement('button');
 const introBrand=document.createElement('span');introBrand.className='dialog-brand';introBrand.textContent='Carmelit / Technician shift';
-const introHints=createIntroHints({mobile:true});
-introTitle.id='intro-title';introNext.type='button';introPanel.append(introBrand,introCount,introTitle,introText,introHints,introNext);introCard.append(introPanel);document.body.append(introCard);
-const introPages=[['Power up the line','Fix 3 cabinets to open the exit.']];
-let introPage=0;
+introTitle.id='intro-title';introNext.type='button';introPanel.append(introBrand,introTitle,introText,introNext);introCard.append(introPanel);document.body.append(introCard);
 let actionRevealTimer;
 function cancelActionReveal(){clearTimeout(actionRevealTimer);}
 function revealReadingScreen(container,textElements,actions){
@@ -226,20 +224,15 @@ function showCompletion(){
  revealReadingScreen(win,[win.querySelector('h1'),win.querySelector('p')],[...win.querySelectorAll('button,a')]);
 }
 function showIntroPage(){
- introCount.style.setProperty('--progress',`${(introPage+1)/introPages.length*100}%`);
- introCount.setAttribute('aria-valuenow',String(introPage+1));
- introCount.setAttribute('aria-valuetext',`Step ${introPage+1} of ${introPages.length}`);
- [introTitle.textContent,introText.textContent]=introPages[introPage];
- introNext.textContent=introPage===introPages.length-1?'Start the game':'Continue';
- revealReadingScreen(introCard,[introTitle,introText,introHints],[introNext]);
+ introTitle.textContent='Your shift begins';
+ introText.textContent='Restore power. Get the line moving.';
+ introNext.textContent='Begin shift';
+ revealReadingScreen(introCard,[introTitle,introText],[introNext]);
 }
 introNext.onclick=async()=>{
- if(introPage<introPages.length-1){introPage++;showIntroPage();}
- else {
-  introNext.disabled=true;
-  await introCard.animate([{opacity:1},{opacity:0}],{duration:reducedMotion?0:350,easing:'ease-in'}).finished;
-  introCard.hidden=true;introNext.disabled=false;document.querySelector('#controls').inert=false;canvas.focus({preventScroll:true});
- }
+ introNext.disabled=true;
+ await introCard.animate([{opacity:1},{opacity:0}],{duration:reducedMotion?0:350,easing:'ease-in'}).finished;
+ introCard.hidden=true;introNext.disabled=false;document.querySelector('#controls').inert=false;canvas.focus({preventScroll:true});
 };
 introCard.addEventListener('keydown',e=>{if(e.key==='Tab'){e.preventDefault();(introNext.inert?introCard:introNext).focus();}});
 
@@ -385,7 +378,7 @@ function nextStep(){
 }
 function depart(){animation={type:'departure',from:travel,to:departureTravel(game.high,chapter),time:0,duration:chapter===2?6:2.1};say(chapter===1?'Line repaired. Departing for the upper line.':'The exit is open. Taking the train through the final tunnel.');}
 function release(index){if(game.release(index))animation={type:'slide',from:travel,to:index,time:0,duration:Math.max(.45,Math.abs(travel-index)*.7)};}
-function reset(){document.body.classList.remove('show-hint');rippleTime=0;tapRipple.visible=false;document.querySelector('#overview').setAttribute('aria-pressed','false');document.querySelector('#overview').setAttribute('aria-label','Overview');document.querySelector('#overview').title='Overview';cancelActionReveal();introCard.hidden=true;document.querySelector('#controls').inert=false;canvas.style.opacity='1';introFocus=0;departureFocus=0;resize();closeWheel();activeCabDirection=null;repairRequested=false;afterWalk=null;game.reset();animation=null;positions(game.low);person.position.copy(point('entrance'));person.rotation.y=0;desiredHeading=0;settlePose();bodyRig.rotation.x=0;repairTool.visible=false;cabinets.forEach(c=>c.setProgress(0,false));win.hidden=true;document.body.classList.remove('departing','entering');restoration.reset();station?.reset();atmosphere?.reset();layout.updateGates(game.state.pressed);updateBoarding();hint();}
+function reset(){tutorialProgress.reset();tutorialCoach.update(null);document.body.classList.remove('show-hint');rippleTime=0;tapRipple.visible=false;document.querySelector('#overview').setAttribute('aria-pressed','false');document.querySelector('#overview').setAttribute('aria-label','Overview');document.querySelector('#overview').title='Overview';cancelActionReveal();introCard.hidden=true;document.querySelector('#controls').inert=false;canvas.style.opacity='1';introFocus=0;departureFocus=0;resize();closeWheel();activeCabDirection=null;repairRequested=false;afterWalk=null;game.reset();animation=null;positions(game.low);person.position.copy(point('entrance'));person.rotation.y=0;desiredHeading=0;settlePose();bodyRig.rotation.x=0;repairTool.visible=false;cabinets.forEach(c=>c.setProgress(0,false));win.hidden=true;document.body.classList.remove('departing','entering');restoration.reset();station?.reset();atmosphere?.reset();layout.updateGates(game.state.pressed);updateBoarding();hint();}
 const raycaster=new THREE.Raycaster(),ndc=new THREE.Vector2();
 function pointerRay(e){const r=canvas.getBoundingClientRect();ndc.set((e.clientX-r.left)/r.width*2-1,1-(e.clientY-r.top)/r.height*2);raycaster.setFromCamera(ndc,camera);scene.updateMatrixWorld(true);}
 function interactiveHit(e){
@@ -514,7 +507,7 @@ canvas.addEventListener('pointerup',e=>{
 canvas.addEventListener('pointercancel',()=>{tapStart=null;finishWheel();});
 canvas.addEventListener('lostpointercapture',()=>{tapStart=null;if(wheelGesture)finishWheel();});
 window.addEventListener('keydown',e=>{if(e.key.toLowerCase()==='r'&&!(e.target instanceof HTMLButtonElement)){overview=false;reset();startEntrance();}});
-document.querySelector('#restart').onclick=()=>{overview=false;reset();startEntrance();};document.querySelector('#again').onclick=()=>{overview=false;reset();startEntrance();};let hintTimer;document.querySelector('#help').onclick=()=>{hint();document.body.classList.toggle('show-hint');clearTimeout(hintTimer);hintTimer=setTimeout(()=>document.body.classList.remove('show-hint'),6000);};
+document.querySelector('#restart').onclick=()=>{overview=false;reset();startEntrance();};document.querySelector('#again').onclick=()=>{overview=false;reset();startEntrance();};document.querySelector('#help').onclick=()=>{if(tutorialCoach.visible)tutorialProgress.hide();else tutorialProgress.show();};
 // Fit both trains at both ends of their travel, including the departure, before adding scenery.
 const screenBounds=new THREE.Box2();
 function measure(){scene.updateMatrixWorld(true);camera.updateMatrixWorld(true);scene.traverse(o=>{if(!o.isMesh)return;for(let p=o;p;p=p.parent)if(p.userData.fitCamera===false)return;const bounds=new THREE.Box3().setFromObject(o);for(const x of [bounds.min.x,bounds.max.x])for(const y of [bounds.min.y,bounds.max.y])for(const z of [bounds.min.z,bounds.max.z]){const p=vector([x,y,z]).applyMatrix4(camera.matrixWorldInverse);screenBounds.expandByPoint(new THREE.Vector2(p.x,p.y));}});}
@@ -563,6 +556,30 @@ function wheelCenter(){const p=platformWheels[activeWheel].rotor.getWorldPositio
 function finishWheel(){if(animation?.type==='wheelDrive')animation.released=true;wheelGesture=null;}
 document.querySelector('#overview').onclick=()=>{if(game.state.motion?.type==='wheelDrive')return;overview=!overview;closeWheel();document.querySelector('#overview').setAttribute('aria-pressed',String(overview));document.querySelector('#overview').setAttribute('aria-label',overview?'Back to player':'Overview');document.querySelector('#overview').title=overview?'Back to player':'Overview';resize();};
 const progressDots=[...document.querySelectorAll('#repair-progress span')];let shownProgress='',shownBusy=null;
+const tutorialPoint=new THREE.Vector3();let shownTutorialActive=null;
+function updateTutorial(dt){
+ const wheel=platformWheels[0],nearWheel=wheel&&person.position.distanceToSquared(wheel.approach)<2.56;
+ const cue=tutorialProgress.update({...game.state,primary:game.primary,secondary:game.secondary,low:game.low,high:game.high,overview,nearWheel,holdingWheel:activeWheel!==null},dt);
+ let screen=null;
+ if(cue?.target){
+  let valid=true;
+  if(cue.target.startsWith('repair'))cabinets[Number(cue.target.at(-1))].root.localToWorld(tutorialPoint.set(0,.42,.20));
+  else if(cue.target==='wheel')wheel.rotor.getWorldPosition(tutorialPoint);
+  else if(cue.target==='ride')carriages[game.primary==='carB'?1:0].localToWorld(tutorialPoint.set(0,.50,0));
+  else {
+   const id=cue.target==='boardPrimary'?game.primary:game.secondary,train=trainModels[id==='carB'?1:0];
+   const door=train.doors.find(d=>d.side===train.boarding.side);
+   valid=Boolean(game.landingFor(id)&&door&&door.open>.9);
+   if(valid)train.root.localToWorld(tutorialPoint.set(door.side*.93,.12,0));
+  }
+  if(valid){
+   tutorialPoint.project(camera);const width=canvas.clientWidth,height=canvas.clientHeight,x=(tutorialPoint.x+1)*width/2,y=(1-tutorialPoint.y)*height/2;
+   if(tutorialPoint.z>=-1&&tutorialPoint.z<=1&&x>24&&x<width-24&&y>82&&y<height-24)screen={x,y,height};
+  }
+ }
+ tutorialCoach.update(cue,screen);
+ const active=tutorialCoach.visible;if(active!==shownTutorialActive){shownTutorialActive=active;document.querySelector('#help').setAttribute('aria-pressed',String(active));}
+}
 function updateMobileJourney(dt){
  const motion=game.state.motion?.type,busy=Boolean(motion),aboard=['carA','carB'].includes(game.state.location);
  const focusWorld=person.position.clone().add(new THREE.Vector3(0,.65,0));
@@ -593,7 +610,7 @@ function startEntrance(){
  game.state.motion={type:'intro'};
  animation={type:'intro',time:0,duration:entranceFrame(0,reducedMotion).duration};
  canvas.style.opacity='0';document.body.classList.add('entering');
- introPage=0;introCard.hidden=true;canvas.tabIndex=-1;
+ introCard.hidden=true;canvas.tabIndex=-1;
  trainModels.forEach(train=>train.updateBoarding(0,null,false,0,false));
 }
 const clock=new THREE.Clock();
@@ -668,6 +685,7 @@ function animate(){
 
  scene.updateMatrixWorld(true);cutaway.update(camera,person.position,dt,{surfaceReveal});
  updateMobileJourney(dt);
+ updateTutorial(dt);
  if(phoneRendering){const ratio=undergroundResolution(undergroundStrength);if(ratio!==renderer.getPixelRatio())renderer.setPixelRatio(ratio);}
  renderer.shadowMap.needsUpdate=shadowSchedule.update(dt,{moving:Boolean(animation)||walked,depth:undergroundStrength});
  renderer.render(scene,camera);

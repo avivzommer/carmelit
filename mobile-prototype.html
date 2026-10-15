@@ -26,7 +26,7 @@
   </style>
   <link rel="stylesheet" href="./game-layout.css?icon-intro=1">
   <script type="importmap">{"imports":{"three":"./vendor/three.module.js"}}</script>
-<link rel="stylesheet" href="./mobile-prototype.css?station-hud=1">
+<link rel="stylesheet" href="./mobile-prototype.css?guided-play=1">
 </head>
 <body data-chapter="2">
   <canvas id="scene" aria-label="Mobile station level. Tap floors to explore, repair cabinets, turn the upper left wheel, and swipe up or down inside a cart or use cabin controls. Overview shows the station. Restart repeats the journey."></canvas>
@@ -41,11 +41,11 @@
       <svg class="focus-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8h5V3m13 5h-5V3M8 21v-5H3m13 5v-5h5"/></svg>
       <span class="overview-icon">Overview</span><span class="focus-icon">Back</span>
     </button>
-    <button id="help">Hint</button>
+    <button id="help" aria-label="Gameplay tips" aria-pressed="false" title="Gameplay tips"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 8a2.5 2.5 0 0 1 5 0c0 2-2.5 2-2.5 4m0 4h.01"/></svg><span>Tips</span></button>
     <button id="restart" aria-label="Restart" title="Restart (R)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 10a8 8 0 1 0-1.8 7.2M20 4v6h-6"/></svg><span>Restart</span></button>
   </div>
   <p id="status" role="status" aria-live="polite"></p>
   <div id="win" hidden role="dialog" aria-modal="true" aria-labelledby="win-title"><section class="station-dialog"><span class="dialog-brand">Carmelit / Line restored</span><h1 id="win-title">Level complete.</h1><p>Power restored. The line is running again.</p><button id="again">Play again</button><a class="level-link" href="./index.html">Return to station</a></section></div>
-<script type="module" src="./mobile-prototype.js?station-hud=1"></script>
+<script type="module" src="./mobile-prototype.js?guided-play=1"></script>
 </body>
 </html>
