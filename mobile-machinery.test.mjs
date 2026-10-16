@@ -308,3 +308,27 @@ test('removing redundant wheels leaves every reachable mobile configuration solv
  assert.ok(states.size>50,'explores wrong turns and unrepaired boarding');
  assert.equal(winning.size,states.size,'no platform becomes stranded when its wheel is removed');
 });
+
+test('tapped service-stair routes complete at phone frame rates without catching a tread stripe',async()=>{
+ const {advanceWalkStep}=await import('./mechanic-walk.js');
+ const layout=createMechanicLayout(2,{serviceStairX:3.8}),station=createSteppedStation(layout);
+ layout.serviceWheel.visible=false;layout.updateGates([true,true,true]);
+ const guard=createWalkGuard([layout.root,station.root]),walker=createFloorWalker(layout.surfaces,guard,{waypoints:[...layout.stairPaths.values(),...layout.upperStairPaths.values()].flat()});
+ for(const id of ['dockFar','dockNear'])for(const dt of [1/60,1/30,1/120]){
+  const top=new THREE.Vector3(...layout.stairPaths.get(id)[3]),bottom=new THREE.Vector3(...layout.floors.repair);
+  for(const [from,to]of [[top,bottom],[bottom,top]]){
+   const points=walker.nearby(from,to)?.points;assert.ok(points,'a real stair route remains reachable');
+   const position=from.clone();
+   for(const point of points){
+    const step={from:position.clone(),to:point,time:0,duration:Math.max(.08,position.distanceTo(point)/1.55)};let arrived=false;
+    for(let frame=0;frame<1200;frame++){
+     const result=advanceWalkStep(step,position,dt,guard);
+     assert.equal(Boolean(result.blocker),false,`${id} must not stall between planned waypoints at ${1/dt}fps`);
+     if(result.arrived){arrived=true;break;}
+    }
+    assert.ok(arrived,'each movement segment finishes');
+   }
+   assert.ok(position.distanceTo(to)<.3,'the mechanic reaches the chosen passage or stair point');
+  }
+ }
+});

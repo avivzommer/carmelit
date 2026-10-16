@@ -61,3 +61,14 @@ test('later exploration stays unguided, including when Tips is enabled again',()
   }
  }
 });
+
+test('wheel guidance waits for the upper cabinet repair, even if the player approaches or holds the wheel',()=>{
+ const game=createMechanicJourney(2,{autoRepair:false}),tutorial=createTutorialProgress();
+ game.state.pressed=[true,false,false];game.state.location=game.primary;game.state.stop=game.high;view(tutorial,game);
+ game.state.location='station2Far';
+ assert.equal(view(tutorial,game,{nearWheel:true}),null,'proximity before the repair must not teach the wheel');
+ assert.equal(view(tutorial,game,{holdingWheel:true}),null,'taking hold early must not skip the cabinet');
+ game.state.motion={type:'repair',index:1};assert.equal(view(tutorial,game,{nearWheel:true}),null);
+ game.finishRepair();assert.equal(view(tutorial,game,{nearWheel:true}).id,'wheel-hold');
+ assert.equal(view(tutorial,game,{holdingWheel:true}).id,'wheel-turn');
+});

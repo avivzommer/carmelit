@@ -17,7 +17,7 @@ export function createTutorialProgress(){
     if(c.location===c.primary)return cue(c.stop===1?'ride-again':'first-ride','Ride uphill',c.stop===1?'Swipe up once more to reach the upper station.':'Swipe up inside the cart to ride uphill.','ride','swipe','You can also tap the cabin arrows.');
     return cue('first-board','Power restored', 'Tap the open train door to board.','boardPrimary');
    }
-   if(!wheelDone&&(c.nearWheel||c.holdingWheel)){
+   if(c.pressed[1]&&!wheelDone&&(c.nearWheel||c.holdingWheel)){
     wheelSeen=true;
     if(c.holdingWheel)return cue('wheel-turn','Call the other cart','Turn clockwise to bring the cart uphill.','wheel','turn','Reverse the turn to send it downhill.');
     return cue('wheel-hold','Call the other cart','Tap the yellow wheel to take hold.','wheel');

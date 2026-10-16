@@ -1,4 +1,4 @@
-import {createTutorialProgress,createTutorialCoach} from './mobile-tutorial.js?single-indicator=1';
+import {createTutorialProgress,createTutorialCoach} from './mobile-tutorial.js?stair-wheel-fix=1';
 import {closestTouchTarget,createWheelGrip,resolveTouchHit,gestureDistance,cabinSwipe} from './mobile-interaction.js?swipe-stairs=1';
 import {createShadowSchedule,createUndergroundResolution} from './mobile-performance.js';
 import {repairWorkPosition,advanceRepairMovement} from './mobile-repair.js';
@@ -9,7 +9,7 @@ import * as THREE from 'three';
 import {createMechanicJourney} from './mechanic-state.mjs?free-walk=1';
 import {createMechanicLayout} from './mechanic-layout.js?station-clearance=2';
 import {createSteppedStation} from './mechanic-station.js?station-clearance=2';
-import {createWalkGuard,createPlayerCutaway} from './mechanic-clearance.js?underground-cache=2';
+import {createWalkGuard,createPlayerCutaway} from './mechanic-clearance.js?continuous-walk=1';
 import {advanceWalkStep} from './mechanic-walk.js';
 import {createRestoration} from './mechanic-restoration.js';
 import {createTrack,trainPosition,STATION_Y,TERMINAL_Z,LINE_CLIP_PLANES,departureTravel,deckHeightAtZ} from './mechanic-track.js';

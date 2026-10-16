@@ -26,9 +26,45 @@ export function createWalkGuard(roots){
   }
   return null;
  }
+ // Sweep the whole walking body continuously. Point samples can miss a thin
+ // tread stripe during planning and then catch it at a different frame cadence.
+ const sweep=new THREE.Box3(),velocity=new THREE.Vector3(),center=new THREE.Vector3();
+ const basis=[new THREE.Vector3(1,0,0),new THREE.Vector3(0,1,0),new THREE.Vector3(0,0,1)];
+ const edges=[new THREE.Vector3(),new THREE.Vector3(),new THREE.Vector3()];
+ const axes=[...basis,new THREE.Vector3(),...Array.from({length:9},()=>new THREE.Vector3())];
+ function intersectsSweep(){
+  edges[0].subVectors(triangle.b,triangle.a);edges[1].subVectors(triangle.c,triangle.b);edges[2].subVectors(triangle.a,triangle.c);
+  axes[3].crossVectors(edges[0],edges[1]);
+  for(let e=0;e<3;e++)for(let a=0;a<3;a++)axes[4+e*3+a].crossVectors(edges[e],basis[a]);
+  let enter=0,leave=1;
+  for(const axis of axes){
+   if(axis.lengthSq()<1e-20)continue;
+   const a=triangle.a.dot(axis),b=triangle.b.dot(axis),c=triangle.c.dot(axis);
+   const radius=WALKER.radius*(Math.abs(axis.x)+Math.abs(axis.z))+(WALKER.height-WALKER.stepHeight)/2*Math.abs(axis.y);
+   const low=Math.min(a,b,c)-radius-center.dot(axis),high=Math.max(a,b,c)+radius-center.dot(axis),speed=velocity.dot(axis);
+   if(Math.abs(speed)<1e-12){if(low>0||high<0)return false;continue;}
+   const t0=low/speed,t1=high/speed;enter=Math.max(enter,Math.min(t0,t1));leave=Math.min(leave,Math.max(t0,t1));
+   if(enter>leave)return false;
+  }
+  return true;
+ }
  function segmentBlocker(from,to){
-  const count=Math.max(1,Math.ceil(from.distanceTo(to)/.06)),p=new THREE.Vector3();
-  for(let i=0;i<=count;i++){const hit=blocker(p.lerpVectors(from,to,i/count));if(hit)return hit;}return null;
+  velocity.subVectors(to,from);center.copy(from);center.y+=(WALKER.height+WALKER.stepHeight)/2;
+  sweep.min.set(Math.min(from.x,to.x)-WALKER.radius,Math.min(from.y,to.y)+WALKER.stepHeight,Math.min(from.z,to.z)-WALKER.radius);
+  sweep.max.set(Math.max(from.x,to.x)+WALKER.radius,Math.max(from.y,to.y)+WALKER.height,Math.max(from.z,to.z)+WALKER.radius);
+  nearby.clear();visitCells(sweep,key=>{for(const item of cells.get(key)||[])nearby.add(item);});
+  for(const {mesh,bounds}of nearby){
+   let visible=true;for(let p=mesh;p;p=p.parent)if(!p.visible){visible=false;break;}
+   if(!visible||!bounds.intersectsBox(sweep))continue;
+   const {geometry:g}=mesh,pos=g.attributes.position,index=g.index,count=index?index.count:pos.count;
+   for(let i=0;i<count;i+=3){
+    triangle.a.fromBufferAttribute(pos,index?index.getX(i):i).applyMatrix4(mesh.matrixWorld);
+    triangle.b.fromBufferAttribute(pos,index?index.getX(i+1):i+1).applyMatrix4(mesh.matrixWorld);
+    triangle.c.fromBufferAttribute(pos,index?index.getX(i+2):i+2).applyMatrix4(mesh.matrixWorld);
+    if(intersectsSweep())return mesh;
+   }
+  }
+  return null;
  }
  function refresh(){
   roots.forEach(root=>root.updateWorldMatrix(true,true));
