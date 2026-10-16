@@ -57,7 +57,6 @@ body[data-chapter] #controls {
 .tutorial-copy small[hidden] { display: none; }
 #tutorial-beacon { position: fixed; z-index: 3; top: 0; left: 0; width: 0; height: 0; pointer-events: none; }
 #tutorial-beacon::before { content: ''; position: absolute; left: -24px; top: -24px; width: 48px; height: 48px; box-sizing: border-box; border: 2px solid #ffdc83; border-radius: 50%; box-shadow: 0 0 0 5px #12384a33; animation: tutorial-ring 1.8s ease-out infinite; }
-#tutorial-beacon svg { position: absolute; left: 14px; top: 14px; width: 26px; height: 26px; padding: 5px; border: 2px solid var(--station-blue); border-radius: 3px; background: var(--station-yellow); color: var(--station-blue); box-shadow: 0 2px 0 var(--station-ink); fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 #tutorial-beacon[data-gesture="swipe"]::before { width: 40px; height: 76px; left: -20px; top: -38px; border-radius: 24px; animation: tutorial-swipe 1.8s ease-in-out infinite; }
 #tutorial-beacon[data-gesture="turn"]::before { border-right-color: transparent; animation: tutorial-turn 2.4s linear infinite; }
 @keyframes tutorial-ring { 0%,100% { opacity: .7; scale: 1; } 60% { opacity: .25; scale: 1.18; } }

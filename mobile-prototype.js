@@ -1,4 +1,4 @@
-import {createTutorialProgress,createTutorialCoach} from './mobile-tutorial.js?focused-tips=1';
+import {createTutorialProgress,createTutorialCoach} from './mobile-tutorial.js?single-indicator=1';
 import {closestTouchTarget,createWheelGrip,resolveTouchHit,gestureDistance,cabinSwipe} from './mobile-interaction.js?swipe-stairs=1';
 import {createShadowSchedule,createUndergroundResolution} from './mobile-performance.js';
 import {repairWorkPosition,advanceRepairMovement} from './mobile-repair.js';
@@ -172,7 +172,7 @@ function updateGait(dt,distance,climbing) {
 const game=createMechanicJourney(chapter,{autoRepair:false}),status=document.querySelector('#status'),win=document.querySelector('#win');
 const near=chapter===2?1:-1;
 const HIGH=STATION_Y[2];
-const carriages=[],buttons=[],signals=[],cabinets=[],powerPulses=[];
+const carriages=[],signals=[],cabinets=[],powerPulses=[];
 const layout=createMechanicLayout(chapter,{box,mesh,serviceStairX:3.8});scene.add(layout.root);
 const station=chapter===2?createSteppedStation(layout,{wheelWallBays:true}):null;
 if(station)scene.add(station.root);
@@ -263,18 +263,16 @@ for(const x of [-1.25,1.25]){
 scene.add(...tracks);
 if(chapter===2){scene.add(createRunout(),createDepartureRunout());person.traverse(o=>{if(o.isMesh)for(const mat of Array.isArray(o.material)?o.material:[o.material])applyDepartureFade(mat);});}
 if(chapter===2)tracks.forEach(track=>track.userData.fitCamera=false);
-// Three repairs retain the familiar walk-on, latch-down button interaction.
+// Cabinets are the repair targets. Keep the floor clear of duplicate controls.
 const repairIds=['station1','station2Far','repair'];
 repairIds.forEach((id,i)=>{
- const [x,y,z]=floors[id],sides=[3,4,32][i],color=[0xf2c43e,0x7db9ca,0xd69483][i];
- const base=mesh(new THREE.CylinderGeometry(.29,.29,.055,32),blue,x,y+.03,z);base.userData.destination=id;
+ const sides=[3,4,32][i],color=[0xf2c43e,0x7db9ca,0xd69483][i];
  const mat=new THREE.MeshStandardMaterial({color,emissive:color,emissiveIntensity:.05});
- const cap=mesh(new THREE.CylinderGeometry(.23,.23,.10,sides),mat,x,y+.125,z);cap.userData.destination=id;buttons.push({cap,y});
  // Hinged cabinet: the mechanic opens it, repairs the contacts, then closes it.
  const cabinet=createRepairCabinet(i);
  cabinet.root.position.copy(layout.cabinetPosition(id));
  scene.add(cabinet.root);addCabinetWrench(cabinet);tag(cabinet.root,'destination',id);cabinets.push(cabinet);signals.push(cabinet.lamp);
- if(i===2){base.userData.focusLayer=cap.userData.focusLayer=cabinet.root.userData.focusLayer='service';}
+ if(i===2)cabinet.root.userData.focusLayer='service';
  // Matching release indicators above the upper station.
  const indicatorX=(i-1)*(chapter===2?.72:.34),indicatorY=chapter===2?deckHeightAtZ(TERMINAL_Z)+2.48:HIGH+.72,indicatorZ=chapter===2?TERMINAL_Z+.12:-4.48;
  if(chapter===2){
@@ -320,7 +318,6 @@ const restoration=createRestoration({near,floors,stairPaths:layout.stairPaths,te
 const {serviceWheel}=layout;serviceWheel.visible=false;
 const platformWheels=createStationWheels(layout);platformWheels.forEach(model=>scene.add(model.root));
 const cabControls=trainModels.map(createCabControls);
-const cabinetHalos=cabinets.map(c=>{const halo=createInteractionHalo(c.root.position,.37);halo.userData.focusLayer=c.root.userData.focusLayer;scene.add(halo);return halo;});
 const tapRipple=createInteractionHalo(new THREE.Vector3(),.12);tapRipple.visible=false;scene.add(tapRipple);let rippleTime=0;
 const routeArrows=[];
 function paintRouteArrow(from,to,destination,layer){
@@ -593,7 +590,6 @@ function updateMobileJourney(dt){
   const local=w.id===(game.state.location==='entrance'?'station1':game.state.location);
   w.rimMaterial.emissive.setHex(0xe8bd49);w.rimMaterial.emissiveIntensity=local&&!busy?(i===activeWheel?.65:.18+.10*Math.sin(performance.now()*.0025)):0;
  });
- cabinetHalos.forEach((halo,i)=>{const available=i===0?['entrance','station1'].includes(game.state.location):i===1?game.state.location.startsWith('station2'):game.state.location==='repair';halo.visible=available&&!overview&&!busy;halo.material.color.setHex(game.state.pressed[i]?0xa9dbb4:0xffdc83);halo.material.opacity=game.state.pressed[i]?.22:.30+.12*Math.sin(performance.now()*.0025);});
  if(rippleTime>0){rippleTime-=dt;tapRipple.scale.setScalar(1+(1-rippleTime/.65)*2);tapRipple.material.opacity=Math.max(0,rippleTime/.65)*.55;}else tapRipple.visible=false;
  cabControls.forEach((cab,i)=>{const inside=game.state.location===(i?'carB':'carA');cab.controls.forEach(c=>{const selected=inside&&busy&&c.up===activeCabDirection;c.material.emissiveIntensity=selected?.8:inside&&!busy&&carriageStep(game.state.stop,i,c.up)!==game.state.stop?.5:.05;c.button.position.y=selected?.19:.23;});});
  const progress=game.state.pressed.join(',');if(progress!==shownProgress){shownProgress=progress;progressDots.forEach((dot,i)=>{dot.classList.toggle('on',game.state.pressed[i]);dot.setAttribute('aria-label',`Repair ${i+1}: ${game.state.pressed[i]?'complete':'pending'}`);});}
@@ -675,7 +671,7 @@ function animate(){
   arms[1].shoulder.rotation.x=(-.93+(repairFrame.pose.working?Math.sin(repairFrame.t*55)*.09:0))*reach;
   arms[1].elbow.rotation.x=-.55*reach;
  }
- buttons.forEach((b,i)=>{const pressed=game.state.pressed[i],active=game.state.motion?.type==='repair'&&game.state.motion.index===i;b.cap.position.y=THREE.MathUtils.damp(b.cap.position.y,b.y+((pressed||active)?.045:.125),12,dt);b.cap.material.emissiveIntensity=pressed?.5:active?.2:.05;signals[i*2].material.emissiveIntensity=pressed?1.2:active?.35:0;signals[i*2+1].material.color.setHex(pressed?signals[i*2+1].userData.repairColor:0x8c9a9e);signals[i*2+1].material.emissiveIntensity=pressed?1.8:0;});
+ cabinets.forEach((c,i)=>{const pressed=game.state.pressed[i],active=game.state.motion?.type==='repair'&&game.state.motion.index===i;signals[i*2].material.emissiveIntensity=pressed?1.2:active?.35:0;signals[i*2+1].material.color.setHex(pressed?signals[i*2+1].userData.repairColor:0x8c9a9e);signals[i*2+1].material.emissiveIntensity=pressed?1.8:0;});
  updatePowerPulses(dt);
  layout.updateGates(game.state.pressed,dt);
  const undergroundStrength=atmosphere.update(person.position,dt,{restored:game.state.pressed.every(Boolean),surfaceReveal});

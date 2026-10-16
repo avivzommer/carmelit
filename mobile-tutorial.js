@@ -47,7 +47,7 @@ export function createTutorialCoach({reducedMotion=false}={}){
    const nextVisible=Boolean(cue);
    if(nextVisible!==visible){visible=nextVisible;card.dataset.visible=String(visible);}
    if(!cue){if(!beacon.hidden)beacon.hidden=true;return;}
-   if(cue.id!==key){key=cue.id;title.textContent=cue.title;text.textContent=cue.text;note.textContent=cue.note;note.hidden=!cue.note;icon.innerHTML=glyph(cue.gesture);beacon.innerHTML=glyph(cue.gesture);beacon.dataset.gesture=cue.gesture;
+   if(cue.id!==key){key=cue.id;title.textContent=cue.title;text.textContent=cue.text;note.textContent=cue.note;note.hidden=!cue.note;icon.innerHTML=glyph(cue.gesture);beacon.dataset.gesture=cue.gesture;
     if(!reducedMotion)copy.animate([{opacity:0,transform:'translateY(3px)'},{opacity:1,transform:'translateY(0)'}],{duration:220,easing:'ease-out'});
    }
    if(beacon.hidden!==!screen)beacon.hidden=!screen;
